@@ -129,15 +129,22 @@ class _ProductFormState extends State<ProductForm> {
                     decoration: BoxDecoration(
                       color: Colors.white10,
                       borderRadius: BorderRadius.circular(15),
-                      image: _imageBytes != null
-                          ? DecorationImage(image: MemoryImage(_imageBytes!), fit: BoxFit.cover)
-                          : widget.product?.image != null
-                              ? DecorationImage(image: NetworkImage(widget.product!.image!), fit: BoxFit.cover)
-                              : null,
                     ),
-                    child: (_imageBytes == null && widget.product?.image == null)
-                        ? const Icon(Icons.image_search, size: 40, color: Colors.white24)
-                        : null,
+                    child: _imageBytes != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(15),
+                            child: Image.memory(_imageBytes!, fit: BoxFit.cover),
+                          )
+                        : widget.product?.image != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(15),
+                                child: Image.network(
+                                  widget.product!.image!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 40, color: Colors.white24),
+                                ),
+                              )
+                            : const Icon(Icons.image_search, size: 40, color: Colors.white24),
                   ),
                   const SizedBox(width: 20),
                   Column(

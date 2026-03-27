@@ -42,11 +42,21 @@ class ProductCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white10,
                       borderRadius: BorderRadius.circular(12),
-                      image: product.image != null
-                          ? DecorationImage(image: NetworkImage(product.image!), fit: BoxFit.cover)
-                          : null,
                     ),
-                    child: product.image == null ? const Icon(Icons.image_not_supported, color: Colors.white24) : null,
+                    child: product.image != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              product.image!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 24, color: Colors.white24),
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                              },
+                            ),
+                          )
+                        : const Icon(Icons.image_not_supported, color: Colors.white24),
                   ),
                   Expanded(
                     child: Column(

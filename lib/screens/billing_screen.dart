@@ -112,13 +112,21 @@ class _BillingScreenState extends State<BillingScreen> {
                             Expanded(
                               child: Container(
                                 width: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: Colors.white10,
-                                  image: product.image != null
-                                      ? DecorationImage(image: NetworkImage(product.image!), fit: BoxFit.cover)
-                                      : null,
-                                ),
-                                child: product.image == null ? const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white24) : null,
+                                color: Colors.white10,
+                                child: product.image != null
+                                    ? ClipRRect(
+                                        borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                                        child: Image.network(
+                                          product.image!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 40, color: Colors.white24),
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                          },
+                                        ),
+                                      )
+                                    : const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white24),
                               ),
                             ),
                             Padding(

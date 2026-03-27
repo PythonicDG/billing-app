@@ -10,6 +10,8 @@ class ApiConstants {
 
   static String invoiceDetailUrl(String id) => '/api/billing/invoices/$id/';
   static String invoiceDownloadPdfUrl(String id) => '/api/billing/invoices/$id/download_pdf/';
+  static String invoicePrintHtmlUrl(String id) => '/api/billing/invoices/$id/print_html/';
+  static String invoiceThermalReceiptUrl(String id) => '/api/billing/invoices/$id/thermal_receipt_pdf/';
   static String deactivateStaffUrl(int userId) => '/api/staff/$userId/deactivate/';
   static String productDetailUrl(String uuid) => '/api/products/$uuid/';
 }

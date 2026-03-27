@@ -261,6 +261,18 @@ class BillingProvider with ChangeNotifier {
     return '${ApiConstants.baseUrl}${ApiConstants.invoiceDownloadPdfUrl(invoiceId)}?token=$token';
   }
 
+  Future<String?> getInvoicePrintHtmlUrl(String invoiceId) async {
+    final token = await _apiService.getToken();
+    if (token == null) return null;
+    return '${ApiConstants.baseUrl}${ApiConstants.invoicePrintHtmlUrl(invoiceId)}?token=$token';
+  }
+
+  Future<String?> getInvoiceThermalReceiptUrl(String invoiceId) async {
+    final token = await _apiService.getToken();
+    if (token == null) return null;
+    return '${ApiConstants.baseUrl}${ApiConstants.invoiceThermalReceiptUrl(invoiceId)}?token=$token';
+  }
+
   Future<List<Customer>> searchCustomers(String query) async {
     try {
       final response = await _apiService.get(ApiConstants.customersUrl, queryParams: {'search': query});

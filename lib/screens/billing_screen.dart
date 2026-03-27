@@ -87,12 +87,12 @@ class _BillingScreenState extends State<BillingScreen> {
             child: productProvider.isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : GridView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      childAspectRatio: 0.72,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
+                      childAspectRatio: 0.60, // Optimized for more content
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
                     ),
                     itemCount: productProvider.products.length,
                     itemBuilder: (context, index) {
@@ -104,42 +104,86 @@ class _BillingScreenState extends State<BillingScreen> {
                       final currentPrice = selectedUnit == 'CENT' ? product.sellingPrice * 10 : product.sellingPrice;
 
                       return Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        elevation: 6,
+                        shadowColor: Colors.black45,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        clipBehavior: Clip.antiAlias,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
+                              flex: 3,
                               child: Container(
                                 width: double.infinity,
-                                color: Colors.white10,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.03),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [Colors.white.withOpacity(0.05), Colors.transparent],
+                                  ),
+                                ),
                                 child: product.image != null
-                                    ? ClipRRect(
-                                        borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-                                        child: Image.network(
-                                          product.image!,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 40, color: Colors.white24),
-                                          loadingBuilder: (context, child, loadingProgress) {
-                                            if (loadingProgress == null) return child;
-                                            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                                          },
-                                        ),
+                                    ? Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Image.network(
+                                              product.image!,
+                                              fit: BoxFit.contain,
+                                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 40, color: Colors.white24),
+                                              loadingBuilder: (context, child, loadingProgress) {
+                                                if (loadingProgress == null) return child;
+                                                return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                              },
+                                            ),
+                                          ),
+                                          if (product.stockQuantity <= 0)
+                                            Container(
+                                              color: Colors.black54,
+                                              child: const Center(
+                                                child: Text(
+                                                  'OUT OF STOCK',
+                                                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 10),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
                                       )
                                     : const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white24),
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  Text(product.brand, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                                  const SizedBox(height: 4),
                                   Text(
-                                    '₹$currentPrice / ${selectedUnit == 'CENT' ? 'Cent' : 'Pc'}',
-                                    style: const TextStyle(color: Color(0xFFFF5722), fontWeight: FontWeight.bold, fontSize: 12),
+                                    product.name,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    product.brand,
+                                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '₹${currentPrice.toStringAsFixed(0)}',
+                                        style: const TextStyle(color: Color(0xFFFF5722), fontWeight: FontWeight.bold, fontSize: 15),
+                                      ),
+                                      Text(
+                                        '/${selectedUnit == 'CENT' ? 'Cent' : 'Pc'}',
+                                        style: const TextStyle(color: Colors.white38, fontSize: 10),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(height: 8),
                                   _buildUnitToggle(
@@ -154,28 +198,39 @@ class _BillingScreenState extends State<BillingScreen> {
                                       }
                                     },
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 10),
                                   SizedBox(
+                                    height: 36,
                                     width: double.infinity,
                                     child: isInCart
-                                        ? Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              _buildQtyBtn(Icons.remove, () => billingProvider.updateQuantity(product.uuid, billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid).quantity - 1, product.stockQuantity)),
-                                              InkWell(
-                                                onTap: () => _showCustomQtyDialog(context, billingProvider, product),
-                                                child: Text('${billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid).quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                              ),
-                                              _buildQtyBtn(Icons.add, () => billingProvider.updateQuantity(product.uuid, billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid).quantity + 1, product.stockQuantity)),
-                                            ],
+                                        ? Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(0.05),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                _buildQtyBtn(Icons.remove, () => billingProvider.updateQuantity(product.uuid, billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid).quantity - 1, product.stockQuantity)),
+                                                GestureDetector(
+                                                  onTap: () => _showCustomQtyDialog(context, billingProvider, product),
+                                                  child: Text(
+                                                    '${billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid).quantity}',
+                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                                  ),
+                                                ),
+                                                _buildQtyBtn(Icons.add, () => billingProvider.updateQuantity(product.uuid, billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid).quantity + 1, product.stockQuantity)),
+                                              ],
+                                            ),
                                           )
                                         : ElevatedButton(
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: const Color(0xFFFF5722),
-                                              padding: const EdgeInsets.symmetric(vertical: 4),
+                                              padding: EdgeInsets.zero,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                             ),
                                             onPressed: product.stockQuantity > 0 ? () => billingProvider.addToCart(product, unit: selectedUnit) : null,
-                                            child: const Text('Add to Cart', style: TextStyle(fontSize: 12, color: Colors.white)),
+                                            child: const Text('Add to Cart', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
                                           ),
                                   ),
                                 ],
@@ -189,15 +244,26 @@ class _BillingScreenState extends State<BillingScreen> {
           ),
           if (billingProvider.cart.isNotEmpty)
             Container(
-              padding: const EdgeInsets.all(16),
-              color: const Color(0xFF1E1E1E),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, -2))],
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Total: ₹${billingProvider.grandTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFFF5722))),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Total Amount', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      Text('₹${billingProvider.grandTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFF5722))),
+                    ],
+                  ),
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12)),
                     onPressed: () => _showCheckoutBottomSheet(context, billingProvider),
-                    child: const Text('Checkout'),
+                    child: const Text('Checkout', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -208,23 +274,25 @@ class _BillingScreenState extends State<BillingScreen> {
   }
 
   Widget _buildQtyBtn(IconData icon, VoidCallback onPressed) {
-    return Container(
-      width: 30,
-      height: 30,
-      decoration: BoxDecoration(color: const Color(0xFFFF5722).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-      child: IconButton(icon: Icon(icon, size: 14, color: const Color(0xFFFF5722)), padding: EdgeInsets.zero, onPressed: onPressed),
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        child: Icon(icon, size: 16, color: const Color(0xFFFF5722)),
+      ),
     );
   }
 
   Widget _buildUnitToggle({required String currentUnit, required Function(String) onToggle}) {
     return Container(
-      height: 30,
-      decoration: BoxDecoration(color: const Color(0xFF2C2C2C), borderRadius: BorderRadius.circular(8)),
+      height: 28,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildUnitOption('Piece', currentUnit == 'PIECE', () => onToggle('PIECE')),
-          _buildUnitOption('Cent', currentUnit == 'CENT', () => onToggle('CENT')),
+          Expanded(child: _buildUnitOption('Pc', currentUnit == 'PIECE', () => onToggle('PIECE'))),
+          Expanded(child: _buildUnitOption('Cent', currentUnit == 'CENT', () => onToggle('CENT'))),
         ],
       ),
     );
@@ -234,10 +302,16 @@ class _BillingScreenState extends State<BillingScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
         alignment: Alignment.center,
-        decoration: BoxDecoration(color: isSelected ? const Color(0xFFFF5722) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
-        child: Text(label, style: TextStyle(fontSize: 10, color: isSelected ? Colors.white : Colors.white54)),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFF5722) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: isSelected ? [BoxShadow(color: const Color(0xFFFF5722).withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2))] : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(fontSize: 10, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? Colors.white : Colors.white60),
+        ),
       ),
     );
   }
@@ -371,32 +445,109 @@ class _BillingScreenState extends State<BillingScreen> {
   void _showSuccessWithDownload(BuildContext context, BillingProvider provider, String invoiceId) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Success'),
-        content: const Text('Order Placed!'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Later')),
-          ElevatedButton(onPressed: () async {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preparing PDF...')));
-            final url = await provider.getInvoicePdfUrl(invoiceId);
-            if (url != null) {
-              final uri = Uri.parse(url);
-              try {
-                final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                if (!success) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open browser. Please check default browser settings.')));
-                }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error generating PDF link. Please ensure you are logged in.')));
-            }
-            Navigator.pop(context);
-          }, child: const Text('Download PDF')),
-        ],
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green, size: 60),
+              const SizedBox(height: 16),
+              const Text('Success!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const Text('Order has been placed successfully.', style: TextStyle(color: Colors.white54)),
+              const SizedBox(height: 24),
+              const Divider(color: Colors.white10),
+              const SizedBox(height: 12),
+              const Text('Print Options', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFF5722))),
+              const SizedBox(height: 16),
+              _buildPrintOption(
+                icon: Icons.picture_as_pdf,
+                label: 'Standard PDF (A4)',
+                subtitle: 'Download professional invoice',
+                onTap: () async => _launchInvoiceUrl(context, await provider.getInvoicePdfUrl(invoiceId)),
+              ),
+              const SizedBox(height: 12),
+              _buildPrintOption(
+                icon: Icons.print,
+                label: 'Print HTML',
+                subtitle: 'Direct browser printing',
+                onTap: () async => _launchInvoiceUrl(context, await provider.getInvoicePrintHtmlUrl(invoiceId)),
+              ),
+              const SizedBox(height: 12),
+              _buildPrintOption(
+                icon: Icons.receipt,
+                label: 'Thermal Receipt (80mm)',
+                subtitle: 'Print using thermal printer',
+                onTap: () async => _launchInvoiceUrl(context, await provider.getInvoiceThermalReceiptUrl(invoiceId)),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Done'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _buildPrintOption({required IconData icon, required String label, required String subtitle, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: const Color(0xFFFF5722).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: const Color(0xFFFF5722), size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchInvoiceUrl(BuildContext context, String? url) async {
+    if (url == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error generating link. Please ensure you are logged in.')));
+      return;
+    }
+    
+    final uri = Uri.parse(url);
+    try {
+      final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open browser. Please check settings.')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 }
 

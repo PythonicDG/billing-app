@@ -112,8 +112,13 @@ class _BillingScreenState extends State<BillingScreen> {
                             Expanded(
                               child: Container(
                                 width: double.infinity,
-                                color: Colors.white10,
-                                child: const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white24),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  image: product.image != null
+                                      ? DecorationImage(image: NetworkImage(product.image!), fit: BoxFit.cover)
+                                      : null,
+                                ),
+                                child: product.image == null ? const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white24) : null,
                               ),
                             ),
                             Padding(
@@ -298,15 +303,20 @@ class _BillingScreenState extends State<BillingScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text('Checkout', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                TextFormField(controller: _customerNameController, decoration: const InputDecoration(labelText: 'Customer Name'), validator: (v) => v!.isEmpty ? 'Required' : null),
-                TextFormField(controller: _customerPhoneController, decoration: const InputDecoration(labelText: 'Phone'), keyboardType: TextInputType.phone),
-                TextFormField(controller: _discountController, decoration: const InputDecoration(labelText: 'Discount'), keyboardType: TextInputType.number, onChanged: (v) => provider.discount = double.tryParse(v) ?? 0),
-                TextFormField(controller: _paidAmountController, decoration: const InputDecoration(labelText: 'Paid Amount'), keyboardType: TextInputType.number),
+                const SizedBox(height: 16),
+                TextFormField(controller: _customerNameController, decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder()), validator: (v) => v!.isEmpty ? 'Required' : null),
+                const SizedBox(height: 12),
+                TextFormField(controller: _customerPhoneController, decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder()), keyboardType: TextInputType.phone),
+                const SizedBox(height: 12),
+                TextFormField(controller: _discountController, decoration: const InputDecoration(labelText: 'Discount', border: OutlineInputBorder()), keyboardType: TextInputType.number, onChanged: (v) => provider.discount = double.tryParse(v) ?? 0),
+                const SizedBox(height: 12),
+                TextFormField(controller: _paidAmountController, decoration: const InputDecoration(labelText: 'Paid Amount', border: OutlineInputBorder()), keyboardType: TextInputType.number),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: _paymentMethod,
                   items: const [DropdownMenuItem(value: 'CASH', child: Text('CASH')), DropdownMenuItem(value: 'CARD', child: Text('CARD')), DropdownMenuItem(value: 'ONLINE', child: Text('ONLINE'))],
                   onChanged: (v) => _paymentMethod = v!,
-                  decoration: const InputDecoration(labelText: 'Payment Method'),
+                  decoration: const InputDecoration(labelText: 'Payment Method', border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 20),
                 if (provider.isLoading) const CircularProgressIndicator()

@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'constants.dart';
 
@@ -68,5 +70,36 @@ class ApiService {
       Uri.parse('${ApiConstants.baseUrl}$endpoint'),
       headers: headers,
     );
+  }
+
+  Future<http.Response> multipartRequest({
+    required String method,
+    required String endpoint,
+    required Map<String, String> fields,
+    Uint8List? fileBytes,
+    String? fileName,
+    String fileField = 'image',
+  }) async {
+    final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
+    final request = http.MultipartRequest(method, uri);
+    
+    final token = await getToken();
+    if (token != null) {
+      request.headers['Authorization'] = 'Token $token';
+    }
+
+    request.fields.addAll(fields);
+
+    if (fileBytes != null && fileName != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        fileField,
+        fileBytes,
+        filename: fileName,
+        contentType: MediaType('image', fileName.split('.').last),
+      ));
+    }
+
+    final streamedResponse = await request.send();
+    return await http.Response.fromStream(streamedResponse);
   }
 }

@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../product_provider.dart';
 
@@ -21,6 +24,9 @@ class _ProductFormState extends State<ProductForm> {
   late TextEditingController _purchasePriceController;
   late TextEditingController _stockQuantityController;
   late TextEditingController _minStockLevelController;
+  XFile? _pickedFile;
+  Uint8List? _imageBytes;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -48,6 +54,17 @@ class _ProductFormState extends State<ProductForm> {
     super.dispose();
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? pickedFile = await _picker.pickImage(source: source);
+    if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        _pickedFile = pickedFile;
+        _imageBytes = bytes;
+      });
+    }
+  }
+
   Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
       final Map<String, dynamic> data = {
@@ -64,9 +81,9 @@ class _ProductFormState extends State<ProductForm> {
       final provider = Provider.of<ProductProvider>(context, listen: false);
       bool success;
       if (widget.product == null) {
-        success = await provider.addProduct(data);
+        success = await provider.addProduct(data, fileBytes: _imageBytes, fileName: _pickedFile?.name);
       } else {
-        success = await provider.updateProduct(widget.product!.uuid, data);
+        success = await provider.updateProduct(widget.product!.uuid, data, fileBytes: _imageBytes, fileName: _pickedFile?.name);
       }
 
       if (success) {
@@ -100,6 +117,44 @@ class _ProductFormState extends State<ProductForm> {
               Text(
                 widget.product == null ? 'Add Product' : 'Edit Product',
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              // Image Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(15),
+                      image: _imageBytes != null
+                          ? DecorationImage(image: MemoryImage(_imageBytes!), fit: BoxFit.cover)
+                          : widget.product?.image != null
+                              ? DecorationImage(image: NetworkImage(widget.product!.image!), fit: BoxFit.cover)
+                              : null,
+                    ),
+                    child: (_imageBytes == null && widget.product?.image == null)
+                        ? const Icon(Icons.image_search, size: 40, color: Colors.white24)
+                        : null,
+                  ),
+                  const SizedBox(width: 20),
+                  Column(
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.photo_library),
+                        onPressed: () => _pickImage(ImageSource.gallery),
+                        label: const Text('Gallery'),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.camera_alt),
+                        onPressed: () => _pickImage(ImageSource.camera),
+                        label: const Text('Camera'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               _buildTextField(_nameController, 'Product Name'),

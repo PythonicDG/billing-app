@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../api_service.dart';
 import '../constants.dart';
@@ -108,8 +109,15 @@ class ProductProvider with ChangeNotifier {
     fetchProducts();
   }
 
-  Future<bool> addProduct(Map<String, dynamic> data) async {
-    final response = await _apiService.post(ApiConstants.productsUrl, data);
+  Future<bool> addProduct(Map<String, dynamic> data, {Uint8List? fileBytes, String? fileName}) async {
+    final fields = data.map((key, value) => MapEntry(key, value.toString()));
+    final response = await _apiService.multipartRequest(
+      method: 'POST',
+      endpoint: ApiConstants.productsUrl,
+      fields: fields,
+      fileBytes: fileBytes,
+      fileName: fileName,
+    );
     if (response.statusCode == 201) {
       fetchProducts();
       return true;
@@ -117,8 +125,15 @@ class ProductProvider with ChangeNotifier {
     return false;
   }
 
-  Future<bool> updateProduct(String uuid, Map<String, dynamic> data) async {
-    final response = await _apiService.patch(ApiConstants.productDetailUrl(uuid), data);
+  Future<bool> updateProduct(String uuid, Map<String, dynamic> data, {Uint8List? fileBytes, String? fileName}) async {
+    final fields = data.map((key, value) => MapEntry(key, value.toString()));
+    final response = await _apiService.multipartRequest(
+      method: 'PATCH',
+      endpoint: ApiConstants.productDetailUrl(uuid),
+      fields: fields,
+      fileBytes: fileBytes,
+      fileName: fileName,
+    );
     if (response.statusCode == 200) {
       fetchProducts();
       return true;

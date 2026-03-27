@@ -359,8 +359,21 @@ class _BillingScreenState extends State<BillingScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Later')),
           ElevatedButton(onPressed: () async {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preparing PDF...')));
             final url = await provider.getInvoicePdfUrl(invoiceId);
-            if (url != null) await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            if (url != null) {
+              final uri = Uri.parse(url);
+              try {
+                final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (!success) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open browser. Please check default browser settings.')));
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error generating PDF link. Please ensure you are logged in.')));
+            }
             Navigator.pop(context);
           }, child: const Text('Download PDF')),
         ],

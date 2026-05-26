@@ -75,12 +75,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
       drawer: AppDrawer(currentRole: authProvider.role ?? 'VIEWER'),
       floatingActionButton: isOwner
-          ? FloatingActionButton.extended(
-              backgroundColor: const Color(0xFFFF5722),
-              onPressed: () => _showProductForm(context),
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text('ADD PRODUCT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              elevation: 6,
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 60.0),
+              child: FloatingActionButton.extended(
+                backgroundColor: const Color(0xFFFF5722),
+                onPressed: () => _showProductForm(context),
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text('ADD PRODUCT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                elevation: 6,
+              ),
             )
           : null,
       body: Column(

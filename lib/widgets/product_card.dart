@@ -22,12 +22,6 @@ class ProductCard extends StatelessWidget {
     final isLowStock = product.stockQuantity <= product.minStockLevel;
     final isOutOfStock = product.stockQuantity <= 0;
 
-    // Calculate discount percentage if MRP is available and higher than selling price
-    double discountPercent = 0.0;
-    if (product.mrp > 0 && product.mrp > product.sellingPrice) {
-      discountPercent = ((product.mrp - product.sellingPrice) / product.mrp) * 100;
-    }
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -64,72 +58,48 @@ class ProductCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Fixed sized beautiful image box
-                      Stack(
-                        children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.03),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white.withOpacity(0.08)),
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.white.withOpacity(0.05),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                            child: product.image != null && product.image!.isNotEmpty
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Image.network(
-                                      product.image!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => const Icon(
-                                        Icons.broken_image_outlined,
-                                        size: 28,
-                                        color: Colors.white24,
-                                      ),
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return const Center(
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        );
-                                      },
-                                    ),
-                                  )
-                                : const Center(
-                                    child: Icon(
-                                      Icons.local_fire_department,
-                                      color: Color(0xFFFF5722),
-                                      size: 32,
-                                    ),
-                                  ),
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.03),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white.withOpacity(0.05),
+                              Colors.transparent,
+                            ],
                           ),
-                          if (discountPercent > 0)
-                            Positioned(
-                              top: 4,
-                              left: 4,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFF5722), // Primary firecracker orange
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '${discountPercent.toStringAsFixed(0)}% OFF',
-                                  style: const TextStyle(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                        ),
+                        child: product.image != null && product.image!.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.network(
+                                  product.image!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => const Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 28,
+                                    color: Colors.white24,
                                   ),
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    );
+                                  },
+                                ),
+                              )
+                            : const Center(
+                                child: Icon(
+                                  Icons.local_fire_department,
+                                  color: Color(0xFFFF5722),
+                                  size: 32,
                                 ),
                               ),
-                            ),
-                        ],
                       ),
                       const SizedBox(width: 16),
                       // Details section
@@ -215,7 +185,7 @@ class ProductCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _priceColumn(
-                        'SELLING PRICE',
+                        'PRICING',
                         currencyFormat.format(product.sellingPrice),
                         color: const Color(0xFFFF5722),
                         isBold: true,
@@ -224,7 +194,6 @@ class ProductCard extends StatelessWidget {
                         _priceColumn(
                           'MRP',
                           currencyFormat.format(product.mrp),
-                          strikeThrough: true,
                           color: Colors.white38,
                         ),
                       if (isOwner)
@@ -233,13 +202,12 @@ class ProductCard extends StatelessWidget {
                           currencyFormat.format(product.purchasePrice),
                           color: const Color(0xFF4CAF50), // Emerald green
                         ),
-                      _priceColumn(
-                        'MARGIN',
-                        isOwner
-                            ? currencyFormat.format(product.sellingPrice - product.purchasePrice)
-                            : '${discountPercent.toStringAsFixed(0)}% OFF',
-                        color: const Color(0xFFFFC107),
-                      ),
+                      if (isOwner)
+                        _priceColumn(
+                          'MARGIN',
+                          currencyFormat.format(product.sellingPrice - product.purchasePrice),
+                          color: const Color(0xFFFFC107),
+                        ),
                     ],
                   ),
                 ],
@@ -302,7 +270,6 @@ class ProductCard extends StatelessWidget {
     String label,
     String value, {
     Color? color,
-    bool strikeThrough = false,
     bool isBold = false,
   }) {
     return Column(
@@ -322,9 +289,8 @@ class ProductCard extends StatelessWidget {
           value,
           style: TextStyle(
             fontSize: isBold ? 15 : 13,
-            fontWeight: isBold || strikeThrough ? FontWeight.bold : FontWeight.w600,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
             color: color,
-            decoration: strikeThrough ? TextDecoration.lineThrough : null,
           ),
         ),
       ],

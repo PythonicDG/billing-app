@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String baseUrl = 'https://vignharta-fataka.up.railway.app'; // Updated to production URL
+  static const String baseUrl = 'http://127.0.0.1:8000'; // Updated to production URL
   static const String loginUrl = '/api/login/';
   static const String productsUrl = '/api/products/';
   static const String staffListUrl = '/api/staff/list/';

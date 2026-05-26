@@ -53,7 +53,7 @@ class BillingProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
-  double _taxRate = 0.18; // 18% GST as per user example
+  double _taxRate = 0.0;
   double _discountAmount = 0.0;
 
   List<InvoiceItem> get cart => _cart;

@@ -19,7 +19,6 @@ class _BillingScreenState extends State<BillingScreen> {
   final _customerNameController = TextEditingController();
   final _customerPhoneController = TextEditingController();
   final _paidAmountController = TextEditingController();
-  final _discountController = TextEditingController(text: '0');
   final _searchController = TextEditingController();
 
   String _paymentMethod = 'CASH';
@@ -383,11 +382,6 @@ class _BillingScreenState extends State<BillingScreen> {
     final isOutOfStock = product.stockQuantity <= 0;
     final isLowStock = product.stockQuantity <= product.minStockLevel && !isOutOfStock;
 
-    double discountPercent = 0.0;
-    if (product.mrp > 0 && product.mrp > product.sellingPrice) {
-      discountPercent = ((product.mrp - product.sellingPrice) / product.mrp) * 100;
-    }
-
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
@@ -431,23 +425,6 @@ class _BillingScreenState extends State<BillingScreen> {
                           child: Icon(Icons.local_fire_department_outlined, size: 36, color: Color(0xFFFF5722)),
                         ),
                 ),
-                // Discount rate badge
-                if (discountPercent > 0)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF5722),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '${discountPercent.toStringAsFixed(0)}% OFF',
-                        style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
                 // Out of stock overlay
                 if (isOutOfStock)
                   Container(
@@ -520,16 +497,6 @@ class _BillingScreenState extends State<BillingScreen> {
                       currencyFormat.format(currentPrice),
                       style: const TextStyle(color: Color(0xFFFF5722), fontWeight: FontWeight.bold, fontSize: 15),
                     ),
-                    const SizedBox(width: 4),
-                    if (product.mrp > product.sellingPrice)
-                      Text(
-                        currencyFormat.format(selectedUnit == 'CENT' ? product.mrp * 10 : product.mrp),
-                        style: const TextStyle(
-                          color: Colors.white30,
-                          fontSize: 11,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
                     const Spacer(),
                     Text(
                       '/${selectedUnit == 'CENT' ? 'Cent' : 'Box'}',
@@ -758,15 +725,6 @@ class _BillingScreenState extends State<BillingScreen> {
 
   // Beautiful billing computations panel
   Widget _buildBillingCalculationsPanel(BillingProvider billingProvider) {
-    // Computing discounts and totals
-    double mrpTotal = billingProvider.cart.fold(0.0, (sum, i) {
-      double itemMrp = i.unit == 'CENT' ? i.product.mrp * 10 : i.product.mrp;
-      return sum + (itemMrp > 0 ? itemMrp * i.quantity : i.unitPrice * i.quantity);
-    });
-
-    double retailDiscount = mrpTotal - billingProvider.subTotal;
-    if (retailDiscount < 0) retailDiscount = 0.0;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -785,23 +743,11 @@ class _BillingScreenState extends State<BillingScreen> {
         children: [
           const Text('BILLING PAYMENT BREAKDOWN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Colors.white38)),
           const SizedBox(height: 10),
-          _summaryRow('Item Total MRP', currencyFormat.format(mrpTotal)),
-          _summaryRow('Product Retail Discount (40% OFF)', '- ${currencyFormat.format(retailDiscount)}', textColor: const Color(0xFF4CAF50)),
-          const Divider(color: Colors.white10),
-          _summaryRow('Cart Subtotal', currencyFormat.format(billingProvider.subTotal)),
-          // Broken GST display (18% GST split into 9% CGST and 9% SGST)
-          _summaryRow('CGST (9%)', '+ ${currencyFormat.format(billingProvider.subTotal * 0.09)}', fontSize: 11),
-          _summaryRow('SGST (9%)', '+ ${currencyFormat.format(billingProvider.subTotal * 0.09)}', fontSize: 11),
-          _summaryRow('GST Tax Total (18%)', '+ ${currencyFormat.format(billingProvider.taxAmount)}', textColor: Colors.amber, fontSize: 11.5),
-          
-          if (billingProvider.grandTotal != billingProvider.totalWithTax)
-            _summaryRow('Additional Invoice Discount', '- ${currencyFormat.format(billingProvider.totalWithTax - billingProvider.grandTotal)}', textColor: const Color(0xFF4CAF50)),
-          
+          _summaryRow('Subtotal', currencyFormat.format(billingProvider.subTotal)),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8.0),
             child: Divider(color: Colors.white30, thickness: 1),
           ),
-          
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -856,8 +802,6 @@ class _BillingScreenState extends State<BillingScreen> {
   // Interactive Payment & Checkout Wizard
   void _showCheckoutWizard(BuildContext context, BillingProvider provider) {
     _paidAmountController.text = provider.grandTotal.toString();
-    _discountController.text = '0';
-    provider.discount = 0.0;
     _paymentMethod = 'CASH';
     double changeAmount = 0.0;
 
@@ -951,25 +895,6 @@ class _BillingScreenState extends State<BillingScreen> {
                         prefixIcon: Icon(Icons.phone_outlined),
                         border: OutlineInputBorder(),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Extra discounts
-                    const Text('DISCOUNTS & CHARGES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Colors.white38)),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: _discountController,
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: const InputDecoration(
-                        labelText: 'Additional Cash Discount (₹)',
-                        prefixIcon: Icon(Icons.discount_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (v) {
-                        provider.discount = double.tryParse(v) ?? 0.0;
-                        setModalState(() {});
-                      },
                     ),
                     const SizedBox(height: 20),
 
@@ -1326,11 +1251,6 @@ class _BillingScreenState extends State<BillingScreen> {
                 
                 // Calculations
                 _receiptRow('Subtotal', '₹${double.parse(data['sub_total']?.toString() ?? '0').toStringAsFixed(2)}'),
-                _receiptRow('CGST (9%)', '₹${(double.parse(data['sub_total']?.toString() ?? '0') * 0.09).toStringAsFixed(2)}'),
-                _receiptRow('SGST (9%)', '₹${(double.parse(data['sub_total']?.toString() ?? '0') * 0.09).toStringAsFixed(2)}'),
-                _receiptRow('GST Tax (18%)', '₹${double.parse(data['tax_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
-                if (double.parse(data['discount_amount']?.toString() ?? '0') > 0)
-                  _receiptRow('Extra Discount', '-₹${double.parse(data['discount_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
                 
                 const Text('--------------------------------', style: TextStyle(color: Colors.black45, fontSize: 12, fontFamily: 'monospace')),
                 

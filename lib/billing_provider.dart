@@ -124,6 +124,14 @@ class BillingProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void updateUnitPrice(String uuid, double price) {
+    final index = _cart.indexWhere((item) => item.product.uuid == uuid);
+    if (index != -1) {
+      _cart[index].unitPrice = price;
+      notifyListeners();
+    }
+  }
+
   double get subTotal => double.parse(_cart.fold(0.0, (sum, item) => sum + item.totalPrice).toStringAsFixed(2));
   double get taxAmount => double.parse((subTotal * _taxRate).toStringAsFixed(2));
   double get totalWithTax => double.parse((subTotal + taxAmount).toStringAsFixed(2));

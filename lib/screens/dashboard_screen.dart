@@ -17,7 +17,7 @@ class DashboardScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.dashboard, size: 80, color: Color(0xFFFF5722)),
+            const Icon(Icons.dashboard_outlined, size: 80, color: Color(0xFF2563EB)),
             const SizedBox(height: 24),
             Text(
               'Welcome, ${authProvider.role}',

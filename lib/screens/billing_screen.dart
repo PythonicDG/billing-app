@@ -21,33 +21,53 @@ class _BillingScreenState extends State<BillingScreen> {
   final _paidAmountController = TextEditingController();
   final _searchController = TextEditingController();
 
+  // Map to hold controllers for each in-cart product quantity textfield to avoid focus/cursor jump
+  final Map<String, TextEditingController> _qtyControllers = {};
+
+  // Map to hold controllers for each in-cart product price textfield to avoid focus/cursor jump
+  final Map<String, TextEditingController> _priceControllers = {};
+
   String _paymentMethod = 'CASH';
   String _selectedCategory = 'ALL';
   String _activeOrdering = 'created_at';
   final Map<String, String> _tempUnits = {};
+  
+  // Pagination State
+  int _currentPage = 1;
+  static const int _itemsPerPage = 12;
 
   // For POS calculations
   final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
-
-  // Classified dynamic categories from names
-  final List<String> _categories = [
-    'ALL',
-    'Sparklers',
-    'Flower Pots',
-    'Chakkars',
-    'Rockets',
-    'Garlands',
-    'Atom Bombs',
-    'Fancy Shots',
-    'Novelties',
-  ];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ProductProvider>(context, listen: false).fetchProducts();
+      final productProvider = Provider.of<ProductProvider>(context, listen: false);
+      productProvider.fetchProducts(pageSize: 100);
+      productProvider.fetchCategories();
     });
+  }
+
+  @override
+  void dispose() {
+    // Correctly dispose of all dynamically created quantity controllers
+    for (var controller in _qtyControllers.values) {
+      controller.dispose();
+    }
+    _qtyControllers.clear();
+
+    // Correctly dispose of all dynamically created price controllers
+    for (var controller in _priceControllers.values) {
+      controller.dispose();
+    }
+    _priceControllers.clear();
+
+    _customerNameController.dispose();
+    _customerPhoneController.dispose();
+    _paidAmountController.dispose();
+    _searchController.dispose();
+    super.dispose();
   }
 
   // Parses name and classifies into categories
@@ -64,6 +84,33 @@ class _BillingScreenState extends State<BillingScreen> {
     return 'Novelties'; // Fallback
   }
 
+  TextEditingController _getQuantityController(String productUuid, int quantity) {
+    final controller = _qtyControllers.putIfAbsent(productUuid, () {
+      return TextEditingController(text: '$quantity');
+    });
+    if (controller.text != '$quantity') {
+      controller.text = '$quantity';
+      controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: controller.text.length),
+      );
+    }
+    return controller;
+  }
+
+  TextEditingController _getPriceController(String productUuid, double price) {
+    final controller = _priceControllers.putIfAbsent(productUuid, () {
+      return TextEditingController(text: '$price');
+    });
+    final parsedVal = double.tryParse(controller.text) ?? -1.0;
+    if (parsedVal != price) {
+      controller.text = '$price';
+      controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: controller.text.length),
+      );
+    }
+    return controller;
+  }
+
   @override
   Widget build(BuildContext context) {
     final billingProvider = Provider.of<BillingProvider>(context);
@@ -73,8 +120,17 @@ class _BillingScreenState extends State<BillingScreen> {
     // Apply dynamic filtering locally over loaded products
     List<Product> displayedProducts = productProvider.products;
     if (_selectedCategory != 'ALL') {
+      final selectedCategoryObj = productProvider.categoriesList.firstWhere(
+        (c) => c.uuid == _selectedCategory,
+        orElse: () => Category(uuid: '', name: ''),
+      );
+      final selectedCategoryName = selectedCategoryObj.name;
+
       displayedProducts = productProvider.products.where((p) {
-        return _getProductCategory(p.name) == _selectedCategory;
+        if (p.category != null && p.category!.isNotEmpty) {
+          return p.category == _selectedCategory;
+        }
+        return _getProductCategory(p.name).toLowerCase() == selectedCategoryName.toLowerCase();
       }).toList();
     }
 
@@ -85,11 +141,11 @@ class _BillingScreenState extends State<BillingScreen> {
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.bolt, color: Color(0xFFFFC107)),
+            Icon(Icons.bolt, color: Color(0xFFD97706)), // Elegant Amber gold bolt
             SizedBox(width: 8),
             Text(
               'Vighnaharta POS Billing',
-              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A)),
             ),
           ],
         ),
@@ -117,7 +173,7 @@ class _BillingScreenState extends State<BillingScreen> {
                   child: _buildCatalogSection(productProvider, displayedProducts, billingProvider),
                 ),
                 // Persistent Cart / Checkout Section
-                VerticalDivider(color: Colors.white10, width: 1, thickness: 1),
+                VerticalDivider(color: const Color(0xFFE2E8F0), width: 1, thickness: 1),
                 Expanded(
                   flex: 38,
                   child: _buildCheckoutSection(billingProvider),
@@ -148,7 +204,7 @@ class _BillingScreenState extends State<BillingScreen> {
             child: Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF5722),
+                color: const Color(0xFF2563EB), // Premium Theme Blue
                 borderRadius: BorderRadius.circular(10),
               ),
               constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
@@ -168,12 +224,12 @@ class _BillingScreenState extends State<BillingScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
             offset: const Offset(0, -4),
           )
         ],
@@ -188,18 +244,18 @@ class _BillingScreenState extends State<BillingScreen> {
               children: [
                 Text(
                   '${billingProvider.cart.length} Products | ${billingProvider.cart.fold(0, (sum, i) => sum + i.quantity)} Pcs',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, fontWeight: FontWeight.w600),
+                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   currencyFormat.format(billingProvider.grandTotal),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFFF5722)),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
                 ),
               ],
             ),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF5722),
+                backgroundColor: const Color(0xFF2563EB),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -224,6 +280,26 @@ class _BillingScreenState extends State<BillingScreen> {
     int crossAxisCount = width < 500 ? 1 : (width < 900 ? 2 : (width < 1400 ? 2 : 3));
     double childAspectRatio = width < 500 ? 1.6 : 0.64;
 
+    // Local pagination calculations
+    final totalItems = displayedProducts.length;
+    final totalPages = (totalItems / _itemsPerPage).ceil();
+    
+    // Safety check for current page bounds
+    if (_currentPage > totalPages && totalPages > 0) {
+      _currentPage = totalPages;
+    } else if (_currentPage < 1) {
+      _currentPage = 1;
+    }
+    
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = startIndex + _itemsPerPage;
+    final paginatedProducts = totalItems == 0 
+        ? <Product>[] 
+        : displayedProducts.sublist(
+            startIndex, 
+            endIndex > totalItems ? totalItems : endIndex,
+          );
+
     return Column(
       children: [
         // Modern search input and filter buttons
@@ -235,57 +311,66 @@ class _BillingScreenState extends State<BillingScreen> {
                 child: Container(
                   decoration: BoxDecoration(
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 3))
+                      BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 3))
                     ],
                   ),
                   child: TextField(
                     controller: _searchController,
-                    style: const TextStyle(fontSize: 14),
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                     decoration: InputDecoration(
                       hintText: 'Quick find firecrackers...',
-                      prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFFFF5722), size: 20),
+                      prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFF2563EB), size: 20),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear_outlined, size: 18),
+                              icon: const Icon(Icons.clear_outlined, size: 18, color: Color(0xFF64748B)),
                               onPressed: () {
                                 _searchController.clear();
                                 productProvider.setSearch('');
-                                setState(() {});
+                                setState(() {
+                                  _currentPage = 1;
+                                });
                               },
                             )
                           : null,
                       filled: true,
-                      fillColor: const Color(0xFF1E1E1E),
+                      fillColor: Colors.white,
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.04)),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFFF5722), width: 1.2),
+                        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.2),
                       ),
                     ),
                     onChanged: (v) {
-                      setState(() {});
+                      setState(() {
+                        _currentPage = 1;
+                      });
                     },
-                    onSubmitted: (v) => productProvider.setSearch(v),
+                    onSubmitted: (v) {
+                      productProvider.setSearch(v);
+                      setState(() {
+                        _currentPage = 1;
+                      });
+                    },
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E1E),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withOpacity(0.04)),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.swap_vert_outlined, color: Colors.white70),
+                  icon: const Icon(Icons.swap_vert_outlined, color: Color(0xFF475569)),
                   tooltip: 'Sort Options',
                   onPressed: () => _showSortOptions(context, productProvider),
                 ),
@@ -300,33 +385,43 @@ class _BillingScreenState extends State<BillingScreen> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            itemCount: _categories.length,
+            itemCount: productProvider.categoriesList.length + 1,
             itemBuilder: (context, index) {
-              final cat = _categories[index];
-              final isSelected = _selectedCategory == cat.toUpperCase();
+              final String catName;
+              final String catId;
+              if (index == 0) {
+                catName = 'ALL';
+                catId = 'ALL';
+              } else {
+                final cat = productProvider.categoriesList[index - 1];
+                catName = cat.name;
+                catId = cat.uuid;
+              }
+              final isSelected = _selectedCategory == catId;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
                   label: Text(
-                    cat,
+                    catName,
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : Colors.white60,
+                      color: isSelected ? Colors.white : const Color(0xFF475569),
                     ),
                   ),
                   selected: isSelected,
-                  selectedColor: const Color(0xFFFF5722),
-                  backgroundColor: const Color(0xFF1E1E1E),
+                  selectedColor: const Color(0xFF2563EB),
+                  backgroundColor: const Color(0xFFF1F5F9),
                   elevation: 0,
                   pressElevation: 2,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   side: BorderSide(
-                    color: isSelected ? Colors.transparent : Colors.white.withOpacity(0.06),
+                    color: isSelected ? Colors.transparent : const Color(0xFFE2E8F0),
                   ),
                   onSelected: (selected) {
                     setState(() {
-                      _selectedCategory = cat.toUpperCase();
+                      _selectedCategory = catId;
+                      _currentPage = 1;
                     });
                   },
                 ),
@@ -339,16 +434,16 @@ class _BillingScreenState extends State<BillingScreen> {
         // Products Grid
         Expanded(
           child: productProvider.isLoading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF5722)))
-              : displayedProducts.isEmpty
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+              : paginatedProducts.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.search_off_outlined, size: 48, color: Colors.white24),
+                          const Icon(Icons.search_off_outlined, size: 48, color: Color(0xFF94A3B8)),
                           const SizedBox(height: 12),
-                          Text('No firecrackers found', style: TextStyle(color: Colors.white60, fontWeight: FontWeight.bold)),
-                          Text('Try a different search category or search text.', style: TextStyle(color: Colors.white30, fontSize: 12)),
+                          const Text('No firecrackers found', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold)),
+                          const Text('Try a different search category or search text.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
                         ],
                       ),
                     )
@@ -360,13 +455,143 @@ class _BillingScreenState extends State<BillingScreen> {
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
                       ),
-                      itemCount: displayedProducts.length,
+                      itemCount: paginatedProducts.length,
                       itemBuilder: (context, index) {
-                        final product = displayedProducts[index];
+                        final product = paginatedProducts[index];
                         return _buildECommerceProductCard(product, billingProvider);
                       },
                     ),
         ),
+
+        // Numbered Pagination Controls
+        if (totalPages > 1)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // PREVIOUS button
+                InkWell(
+                  onTap: _currentPage > 1
+                      ? () {
+                          setState(() {
+                            _currentPage--;
+                          });
+                        }
+                      : null,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _currentPage > 1 ? const Color(0xFFEFF6FF) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.chevron_left_outlined,
+                          size: 18,
+                          color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'PREV',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Numbered page selectors
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(totalPages, (index) {
+                    final pageNum = index + 1;
+                    final isCurrent = pageNum == _currentPage;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            _currentPage = pageNum;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isCurrent ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isCurrent ? Colors.transparent : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Text(
+                            '$pageNum',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: isCurrent ? Colors.white : const Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+
+                // NEXT button
+                InkWell(
+                  onTap: _currentPage < totalPages
+                      ? () {
+                          setState(() {
+                            _currentPage++;
+                          });
+                        }
+                      : null,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _currentPage < totalPages ? const Color(0xFFEFF6FF) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'NEXT',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right_outlined,
+                          size: 18,
+                          color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -384,16 +609,16 @@ class _BillingScreenState extends State<BillingScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isInCart
-              ? const Color(0xFFFF5722).withOpacity(0.5)
-              : Colors.white.withOpacity(0.04),
-          width: isInCart ? 1.8 : 1.2,
+              ? const Color(0xFF2563EB)
+              : const Color(0xFFE2E8F0),
+          width: isInCart ? 1.5 : 1.0,
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 3))
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 3))
         ],
       ),
       clipBehavior: Clip.antiAlias,
@@ -407,14 +632,14 @@ class _BillingScreenState extends State<BillingScreen> {
               fit: StackFit.expand,
               children: [
                 Container(
-                  color: Colors.white.withOpacity(0.02),
+                  color: const Color(0xFFF8FAFC),
                   child: product.image != null && product.image!.isNotEmpty
                       ? Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: Image.network(
                             product.image!,
                             fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image_outlined, size: 28, color: Colors.white24),
+                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image_outlined, size: 28, color: Color(0xFF94A3B8)),
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
                               return const Center(child: CircularProgressIndicator(strokeWidth: 2));
@@ -422,24 +647,24 @@ class _BillingScreenState extends State<BillingScreen> {
                           ),
                         )
                       : const Center(
-                          child: Icon(Icons.local_fire_department_outlined, size: 36, color: Color(0xFFFF5722)),
+                          child: Icon(Icons.local_fire_department_outlined, size: 36, color: Color(0xFF2563EB)),
                         ),
                 ),
                 // Out of stock overlay
                 if (isOutOfStock)
                   Container(
-                    color: Colors.black87,
+                    color: Colors.white.withOpacity(0.85),
                     alignment: Alignment.center,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.2),
+                        color: const Color(0xFFFEF2F2),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.redAccent),
+                        border: Border.all(color: const Color(0xFFEF4444)),
                       ),
                       child: const Text(
                         'SOLD OUT',
-                        style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                        style: TextStyle(color: Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                       ),
                     ),
                   ),
@@ -455,7 +680,7 @@ class _BillingScreenState extends State<BillingScreen> {
               children: [
                 Text(
                   product.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.1),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.1, color: Color(0xFF0F172A)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -465,7 +690,7 @@ class _BillingScreenState extends State<BillingScreen> {
                   children: [
                     Text(
                       product.brand,
-                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10.5, fontWeight: FontWeight.w600),
+                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 10.5, fontWeight: FontWeight.w600),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -480,10 +705,10 @@ class _BillingScreenState extends State<BillingScreen> {
                         fontSize: 9.5,
                         fontWeight: FontWeight.bold,
                         color: isOutOfStock
-                            ? Colors.redAccent
+                            ? const Color(0xFFEF4444)
                             : isLowStock
-                                ? Colors.orangeAccent
-                                : const Color(0xFF4CAF50),
+                                ? const Color(0xFFF97316)
+                                : const Color(0xFF16A34A),
                       ),
                     ),
                   ],
@@ -495,12 +720,12 @@ class _BillingScreenState extends State<BillingScreen> {
                   children: [
                     Text(
                       currencyFormat.format(currentPrice),
-                      style: const TextStyle(color: Color(0xFFFF5722), fontWeight: FontWeight.bold, fontSize: 15),
+                      style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                     const Spacer(),
                     Text(
                       '/${selectedUnit == 'CENT' ? 'Cent' : 'Box'}',
-                      style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 9.5, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9.5, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -528,9 +753,9 @@ class _BillingScreenState extends State<BillingScreen> {
                   child: isInCart
                       ? Container(
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.04),
+                            color: const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFFF5722).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3)),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -543,18 +768,47 @@ class _BillingScreenState extends State<BillingScreen> {
                                   product.stockQuantity,
                                 ),
                               ),
-                              GestureDetector(
-                                onTap: () => _showCustomQtyDialog(context, billingProvider, product),
-                                child: Text(
-                                  '${cartItem!.quantity}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              // INLINE EDITABLE QUANTITY TEXTFIELD (Direct typing with no popups)
+                              SizedBox(
+                                width: 45,
+                                height: 26,
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: TextField(
+                                    controller: _getQuantityController(product.uuid, cartItem!.quantity),
+                                    keyboardType: TextInputType.number,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB)),
+                                    decoration: const InputDecoration(
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                    onChanged: (value) {
+                                      if (value.isNotEmpty) {
+                                        final newQty = int.tryParse(value);
+                                        if (newQty != null && newQty > 0) {
+                                          billingProvider.updateQuantity(
+                                            product.uuid,
+                                            newQty,
+                                            product.stockQuantity,
+                                          );
+                                        }
+                                      }
+                                    },
+                                  ),
                                 ),
                               ),
                               _buildQtyBtn(
                                 Icons.add_outlined,
                                 () => billingProvider.updateQuantity(
                                   product.uuid,
-                                  cartItem.quantity + 1,
+                                  cartItem!.quantity + 1,
                                   product.stockQuantity,
                                 ),
                               ),
@@ -563,7 +817,7 @@ class _BillingScreenState extends State<BillingScreen> {
                         )
                       : ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF5722),
+                            backgroundColor: const Color(0xFF2563EB),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             padding: EdgeInsets.zero,
                           ),
@@ -571,8 +825,8 @@ class _BillingScreenState extends State<BillingScreen> {
                               ? () => billingProvider.addToCart(product, unit: selectedUnit)
                               : null,
                           child: const Text(
-                            'ADD TO CART',
-                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
+                             'ADD TO CART',
+                             style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                         ),
                 ),
@@ -587,24 +841,24 @@ class _BillingScreenState extends State<BillingScreen> {
   // Active Checkout right side POS panel / sheet
   Widget _buildCheckoutSection(BillingProvider billingProvider) {
     return Container(
-      color: const Color(0xFF161616),
+      color: const Color(0xFFF8FAFC), // Cool slate-50 background
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.04))),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.shopping_basket_outlined, color: Color(0xFFFF5722), size: 20),
+                    Icon(Icons.shopping_basket_outlined, color: Color(0xFF2563EB), size: 20),
                     SizedBox(width: 8),
-                    Text('Active Billing Cart', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text('Active Billing Cart', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
                   ],
                 ),
                 GestureDetector(
@@ -617,7 +871,7 @@ class _BillingScreenState extends State<BillingScreen> {
                   child: Text(
                     'Clear All',
                     style: TextStyle(
-                      color: billingProvider.cart.isNotEmpty ? Colors.redAccent : Colors.white30,
+                      color: billingProvider.cart.isNotEmpty ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
                       fontWeight: FontWeight.bold,
                       fontSize: 12.5,
                     ),
@@ -630,14 +884,14 @@ class _BillingScreenState extends State<BillingScreen> {
           // Scrollable Cart Items
           Expanded(
             child: billingProvider.cart.isEmpty
-                ? Center(
+                ? const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.shopping_cart_outlined, size: 40, color: Colors.white12),
-                        const SizedBox(height: 12),
-                        Text('Your cart is empty', style: TextStyle(color: Colors.white24, fontWeight: FontWeight.bold)),
-                        Text('Click ADD TO CART on any firecracker.', style: TextStyle(color: Colors.white12, fontSize: 11)),
+                        Icon(Icons.shopping_cart_outlined, size: 40, color: Color(0xFF94A3B8)),
+                        SizedBox(height: 12),
+                        Text('Your cart is empty', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold)),
+                        Text('Click ADD TO CART on any firecracker.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
                       ],
                     ),
                   )
@@ -650,9 +904,9 @@ class _BillingScreenState extends State<BillingScreen> {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E1E1E),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withOpacity(0.03)),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Row(
                           children: [
@@ -662,27 +916,121 @@ class _BillingScreenState extends State<BillingScreen> {
                                 children: [
                                   Text(
                                     item.product.name,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF0F172A)),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
                                   Row(
                                     children: [
+                                      // INLINE EDITABLE PRICE TEXTFIELD inside the Checkout list
+                                      SizedBox(
+                                        width: 58,
+                                        height: 24,
+                                        child: Container(
+                                          alignment: Alignment.centerLeft,
+                                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF8FAFC),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Text(
+                                                '₹',
+                                                style: TextStyle(
+                                                  color: Color(0xFF475569),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: TextField(
+                                                  controller: _getPriceController(item.product.uuid, item.unitPrice),
+                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF0F172A),
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 10.5,
+                                                  ),
+                                                  decoration: const InputDecoration(
+                                                    border: InputBorder.none,
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.only(left: 2),
+                                                  ),
+                                                  onChanged: (value) {
+                                                    if (value.isNotEmpty) {
+                                                      final newPrice = double.tryParse(value);
+                                                      if (newPrice != null && newPrice >= 0) {
+                                                        billingProvider.updateUnitPrice(item.product.uuid, newPrice);
+                                                      }
+                                                    }
+                                                  },
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const Text(
+                                        ' x ',
+                                        style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                                      ),
+                                      // INLINE EDITABLE QUANTITY TEXTFIELD inside the Checkout list
+                                      SizedBox(
+                                        width: 42,
+                                        height: 24,
+                                        child: Container(
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEFF6FF),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3), width: 1),
+                                          ),
+                                          child: TextField(
+                                            controller: _getQuantityController(item.product.uuid, item.quantity),
+                                            keyboardType: TextInputType.number,
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              color: Color(0xFF2563EB),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                            decoration: const InputDecoration(
+                                              border: InputBorder.none,
+                                              isDense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                            onChanged: (value) {
+                                              if (value.isNotEmpty) {
+                                                final newQty = int.tryParse(value);
+                                                if (newQty != null && newQty > 0) {
+                                                  billingProvider.updateQuantity(
+                                                    item.product.uuid,
+                                                    newQty,
+                                                    item.product.stockQuantity,
+                                                  );
+                                                }
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ),
                                       Text(
-                                        '${currencyFormat.format(item.unitPrice)} x ${item.quantity} ${item.unit == 'CENT' ? 'Cent' : 'Box'}',
-                                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                        ' ${item.unit == 'CENT' ? 'Cent' : 'Box'}',
+                                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
                                       ),
                                       const SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFFFC107).withOpacity(0.1),
+                                          color: const Color(0xFFEFF6FF),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           item.product.brand,
-                                          style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFFFFC107)),
+                                          style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
                                         ),
                                       ),
                                     ],
@@ -697,13 +1045,13 @@ class _BillingScreenState extends State<BillingScreen> {
                               children: [
                                 Text(
                                   currencyFormat.format(item.totalPrice),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFFF5722)),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB)),
                                 ),
                                 GestureDetector(
                                   onTap: () => billingProvider.removeFromCart(item.product.uuid),
                                   child: const Padding(
                                     padding: EdgeInsets.only(top: 4.0),
-                                    child: Icon(Icons.delete_forever_outlined, color: Colors.redAccent, size: 16),
+                                    child: Icon(Icons.delete_forever_outlined, color: Color(0xFFEF4444), size: 16),
                                   ),
                                 ),
                               ],
@@ -727,34 +1075,34 @@ class _BillingScreenState extends State<BillingScreen> {
   Widget _buildBillingCalculationsPanel(BillingProvider billingProvider) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black12,
             blurRadius: 8,
-            offset: const Offset(0, -3),
+            offset: Offset(0, -3),
           )
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('BILLING PAYMENT BREAKDOWN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Colors.white38)),
+          const Text('BILLING PAYMENT BREAKDOWN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF94A3B8))),
           const SizedBox(height: 10),
           _summaryRow('Subtotal', currencyFormat.format(billingProvider.subTotal)),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8.0),
-            child: Divider(color: Colors.white30, thickness: 1),
+            child: Divider(color: Color(0xFFE2E8F0), thickness: 1),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Grand Net Total', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text('Grand Net Total', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
               Text(
                 currencyFormat.format(billingProvider.grandTotal),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFF5722)),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
               ),
             ],
           ),
@@ -766,15 +1114,15 @@ class _BillingScreenState extends State<BillingScreen> {
             height: 48,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF5722),
+                backgroundColor: const Color(0xFF2563EB),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 4,
+                elevation: 1,
               ),
               onPressed: () => _showCheckoutWizard(context, billingProvider),
-              icon: const Icon(Icons.security_outlined, size: 20),
+              icon: const Icon(Icons.security_outlined, size: 20, color: Colors.white),
               label: const Text(
                 'CHECKOUT & GENERATE BILL',
-                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 13.5),
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 13.5, color: Colors.white),
               ),
             ),
           ),
@@ -789,17 +1137,16 @@ class _BillingScreenState extends State<BillingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: fontSize, color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.w600)),
+          Text(label, style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569), fontWeight: FontWeight.w600)),
           Text(
             value,
-            style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: textColor ?? Colors.white),
+            style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: textColor ?? const Color(0xFF0F172A)),
           ),
         ],
       ),
     );
   }
-
-  // Interactive Payment & Checkout Wizard
+   // Interactive Payment & Checkout Wizard
   void _showCheckoutWizard(BuildContext context, BillingProvider provider) {
     _paidAmountController.text = provider.grandTotal.toString();
     _paymentMethod = 'CASH';
@@ -808,7 +1155,7 @@ class _BillingScreenState extends State<BillingScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -837,32 +1184,33 @@ class _BillingScreenState extends State<BillingScreen> {
                       child: Container(
                         width: 50,
                         height: 5,
-                        decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(10)),
+                        decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                     const SizedBox(height: 16),
                     const Row(
                       children: [
-                        Icon(Icons.payment_outlined, color: Color(0xFFFF5722)),
+                        Icon(Icons.payment_outlined, color: Color(0xFF2563EB)),
                         SizedBox(width: 8),
-                        Text('Billing Checkout Portal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text('Billing Checkout Portal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                       ],
                     ),
-                    const Divider(color: Colors.white10, height: 24),
+                    const Divider(color: Color(0xFFE2E8F0), height: 24),
 
                     // Customer Profile
-                    const Text('CUSTOMER PROFILE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Colors.white38)),
+                    const Text('CUSTOMER PROFILE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF94A3B8))),
                     const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
                           child: TextFormField(
                             controller: _customerNameController,
-                            style: const TextStyle(fontSize: 14),
+                            style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                             decoration: const InputDecoration(
                               labelText: 'Customer Name',
                               prefixIcon: Icon(Icons.person_outline),
-                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: Color(0xFFF8FAFC),
                             ),
                             validator: (v) => v!.isEmpty ? 'Enter customer name' : null,
                           ),
@@ -871,7 +1219,7 @@ class _BillingScreenState extends State<BillingScreen> {
                         // Quick autocomplete walk-in client
                         OutlinedButton(
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFFF5722)),
+                            side: const BorderSide(color: Color(0xFF2563EB)),
                             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
@@ -881,7 +1229,7 @@ class _BillingScreenState extends State<BillingScreen> {
                               _customerPhoneController.text = '9999999999';
                             });
                           },
-                          child: const Text('WALK-IN', style: TextStyle(color: Color(0xFFFF5722), fontWeight: FontWeight.bold, fontSize: 11)),
+                          child: const Text('WALK-IN', style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 11)),
                         ),
                       ],
                     ),
@@ -889,33 +1237,34 @@ class _BillingScreenState extends State<BillingScreen> {
                     TextFormField(
                       controller: _customerPhoneController,
                       keyboardType: TextInputType.phone,
-                      style: const TextStyle(fontSize: 14),
+                      style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                       decoration: const InputDecoration(
                         labelText: 'Mobile Number',
                         prefixIcon: Icon(Icons.phone_outlined),
-                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Color(0xFFF8FAFC),
                       ),
                     ),
                     const SizedBox(height: 20),
 
                     // Payment details
-                    const Text('PAYMENT DETAILS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Colors.white38)),
+                    const Text('PAYMENT DETAILS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF94A3B8))),
                     const SizedBox(height: 10),
                     
                     // Segmented Payment Method Selector
                     Container(
                       height: 46,
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.all(3),
                       child: Row(
                         children: [
-                          Expanded(child: _paymentSegment('CASH', Icons.money, _paymentMethod == 'CASH', () {
+                          Expanded(child: _paymentSegment('CASH', Icons.money_outlined, _paymentMethod == 'CASH', () {
                             setModalState(() { _paymentMethod = 'CASH'; });
                           })),
-                          Expanded(child: _paymentSegment('CARD', Icons.credit_card, _paymentMethod == 'CARD', () {
+                          Expanded(child: _paymentSegment('CARD', Icons.credit_card_outlined, _paymentMethod == 'CARD', () {
                             setModalState(() { _paymentMethod = 'CARD'; });
                           })),
-                          Expanded(child: _paymentSegment('UPI', Icons.qr_code, _paymentMethod == 'UPI', () {
+                          Expanded(child: _paymentSegment('UPI', Icons.qr_code_outlined, _paymentMethod == 'UPI', () {
                             setModalState(() { _paymentMethod = 'UPI'; });
                           })),
                         ],
@@ -931,11 +1280,12 @@ class _BillingScreenState extends State<BillingScreen> {
                             child: TextFormField(
                               controller: _paidAmountController,
                               keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 14),
+                              style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                               decoration: const InputDecoration(
                                 labelText: 'Received Cash (₹)',
-                                prefixIcon: Icon(Icons.attach_money),
-                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.payments_outlined),
+                                filled: true,
+                                fillColor: Color(0xFFF8FAFC),
                               ),
                               onChanged: (v) {
                                 setModalState(() {});
@@ -946,17 +1296,17 @@ class _BillingScreenState extends State<BillingScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF4CAF50).withOpacity(0.1),
+                              color: const Color(0xFF16A34A).withOpacity(0.08), // Soft emerald tint
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.3)),
+                              border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.3)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('RETURN CHANGE', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white38)),
+                                const Text('RETURN CHANGE', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
                                 Text(
                                   currencyFormat.format(changeAmount),
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4CAF50)),
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
                                 ),
                               ],
                             ),
@@ -968,9 +1318,9 @@ class _BillingScreenState extends State<BillingScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E1E1E),
+                          color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: const Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -978,14 +1328,14 @@ class _BillingScreenState extends State<BillingScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('CREDIT / DEBIT TRANSACTION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFFFC107))),
-                                Icon(Icons.payment, color: Colors.white54, size: 18),
+                                Text('CREDIT / DEBIT TRANSACTION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
+                                Icon(Icons.payment, color: Color(0xFF475569), size: 18),
                               ],
                             ),
                             SizedBox(height: 8),
                             Text(
                               'Please swipe or tap the card on your pos terminal. The bill status will automatically settle once authorized.',
-                              style: TextStyle(fontSize: 11.5, color: Colors.white38),
+                              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
                             ),
                           ],
                         ),
@@ -995,9 +1345,9 @@ class _BillingScreenState extends State<BillingScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E1E1E),
+                          color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Row(
                           children: [
@@ -1007,19 +1357,20 @@ class _BillingScreenState extends State<BillingScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
-                              child: const Icon(Icons.qr_code_2_outlined, color: Colors.black, size: 50),
+                              child: const Icon(Icons.qr_code_2_outlined, color: Color(0xFF0F172A), size: 50),
                             ),
                             const SizedBox(width: 12),
                             const Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('UPI INSTANT QR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4CAF50))),
+                                  Text('UPI INSTANT QR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
                                   SizedBox(height: 4),
                                   Text(
                                     'Instruct client to scan the active POS scanner screen or billing desk card.',
-                                    style: TextStyle(fontSize: 10.5, color: Colors.white38),
+                                    style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
                                   ),
                                 ],
                               ),
@@ -1030,7 +1381,7 @@ class _BillingScreenState extends State<BillingScreen> {
                     ],
 
                     const SizedBox(height: 24),
-                    const Divider(color: Colors.white10),
+                    const Divider(color: Color(0xFFE2E8F0)),
 
                     // Net Pay and Actions
                     Row(
@@ -1039,18 +1390,18 @@ class _BillingScreenState extends State<BillingScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('NET TO COLLECT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white38)),
-                            Text(currencyFormat.format(provider.grandTotal), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFF5722))),
+                            const Text('NET TO COLLECT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                            Text(currencyFormat.format(provider.grandTotal), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
                           ],
                         ),
                         if (provider.isLoading)
-                          const CircularProgressIndicator(color: Color(0xFFFF5722))
+                          const CircularProgressIndicator(color: Color(0xFF2563EB))
                         else
                           Row(
                             children: [
                               OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: Colors.white.withOpacity(0.12)),
+                                  side: const BorderSide(color: Color(0xFFE2E8F0)),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                 ),
@@ -1067,13 +1418,13 @@ class _BillingScreenState extends State<BillingScreen> {
                                     }
                                   }
                                 },
-                                icon: const Icon(Icons.preview_outlined, size: 16, color: Colors.white),
-                                label: const Text('PREVIEW', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                icon: const Icon(Icons.preview_outlined, size: 16, color: Color(0xFF475569)),
+                                label: const Text('PREVIEW', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 12)),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFF5722),
+                                  backgroundColor: const Color(0xFF2563EB),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                                 ),
@@ -1115,23 +1466,23 @@ class _BillingScreenState extends State<BillingScreen> {
       child: Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFFF5722) : Colors.transparent,
+          color: active ? const Color(0xFF2563EB) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           boxShadow: active
-              ? [BoxShadow(color: const Color(0xFFFF5722).withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2))]
+              ? [BoxShadow(color: const Color(0xFF2563EB).withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))]
               : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 14, color: active ? Colors.white : Colors.white60),
+            Icon(icon, size: 14, color: active ? Colors.white : const Color(0xFF64748B)),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.bold,
-                color: active ? Colors.white : Colors.white60,
+                color: active ? Colors.white : const Color(0xFF64748B),
               ),
             ),
           ],
@@ -1313,7 +1664,7 @@ class _BillingScreenState extends State<BillingScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1326,7 +1677,7 @@ class _BillingScreenState extends State<BillingScreen> {
               child: Container(
                 width: 50,
                 height: 5,
-                decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(10)),
               ),
             ),
             const SizedBox(height: 8),
@@ -1343,7 +1694,7 @@ class _BillingScreenState extends State<BillingScreen> {
   void _showSortOptions(BuildContext context, ProductProvider provider) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1357,21 +1708,24 @@ class _BillingScreenState extends State<BillingScreen> {
                 children: [
                   const Text(
                     'Sort Firecrackers By',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 20),
+                    icon: const Icon(Icons.close, size: 20, color: Color(0xFF64748B)),
                     onPressed: () => Navigator.pop(context),
                   )
                 ],
               ),
-              const Divider(color: Colors.white10),
+              const Divider(color: Color(0xFFE2E8F0)),
               _sortTile(
                 title: 'Featured / Newest first',
                 icon: Icons.star_border_outlined,
                 active: _activeOrdering == 'created_at',
                 onTap: () {
-                  setState(() { _activeOrdering = 'created_at'; });
+                  setState(() {
+                    _activeOrdering = 'created_at';
+                    _currentPage = 1;
+                  });
                   provider.setOrdering('created_at');
                   Navigator.pop(context);
                 },
@@ -1381,7 +1735,10 @@ class _BillingScreenState extends State<BillingScreen> {
                 icon: Icons.trending_up_outlined,
                 active: _activeOrdering == 'selling_price',
                 onTap: () {
-                  setState(() { _activeOrdering = 'selling_price'; });
+                  setState(() {
+                    _activeOrdering = 'selling_price';
+                    _currentPage = 1;
+                  });
                   provider.setOrdering('selling_price');
                   Navigator.pop(context);
                 },
@@ -1391,7 +1748,10 @@ class _BillingScreenState extends State<BillingScreen> {
                 icon: Icons.trending_down_outlined,
                 active: _activeOrdering == '-selling_price',
                 onTap: () {
-                  setState(() { _activeOrdering = '-selling_price'; });
+                  setState(() {
+                    _activeOrdering = '-selling_price';
+                    _currentPage = 1;
+                  });
                   provider.setOrdering('-selling_price');
                   Navigator.pop(context);
                 },
@@ -1401,7 +1761,10 @@ class _BillingScreenState extends State<BillingScreen> {
                 icon: Icons.production_quantity_limits_outlined,
                 active: _activeOrdering == 'stock_quantity',
                 onTap: () {
-                  setState(() { _activeOrdering = 'stock_quantity'; });
+                  setState(() {
+                    _activeOrdering = 'stock_quantity';
+                    _currentPage = 1;
+                  });
                   provider.setOrdering('stock_quantity');
                   Navigator.pop(context);
                 },
@@ -1420,62 +1783,17 @@ class _BillingScreenState extends State<BillingScreen> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: active ? const Color(0xFFFF5722) : Colors.white60),
+      leading: Icon(icon, color: active ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
       title: Text(
         title,
         style: TextStyle(
           fontWeight: active ? FontWeight.bold : FontWeight.normal,
-          color: active ? const Color(0xFFFF5722) : Colors.white70,
+          color: active ? const Color(0xFF2563EB) : const Color(0xFF334155),
         ),
       ),
-      trailing: active ? const Icon(Icons.check, color: Color(0xFFFF5722)) : null,
+      trailing: active ? const Icon(Icons.check, color: Color(0xFF2563EB)) : null,
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    );
-  }
-
-  // Active custom Qty Dialog
-  void _showCustomQtyDialog(BuildContext context, BillingProvider provider, Product product) {
-    final item = provider.cart.firstWhere((item) => item.product.uuid == product.uuid);
-    final controller = TextEditingController(text: '${item.quantity}');
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text(
-          'Edit Qty (${item.unit == 'CENT' ? 'Cent' : 'Box'})',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722)),
-            onPressed: () {
-              provider.updateQuantity(
-                product.uuid,
-                int.tryParse(controller.text) ?? 0,
-                product.stockQuantity,
-              );
-              Navigator.pop(context);
-            },
-            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1487,7 +1805,7 @@ class _BillingScreenState extends State<BillingScreen> {
         height: 34,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.center,
-        child: Icon(icon, size: 16, color: const Color(0xFFFF5722)),
+        child: Icon(icon, size: 16, color: const Color(0xFF2563EB)),
       ),
     );
   }
@@ -1496,7 +1814,7 @@ class _BillingScreenState extends State<BillingScreen> {
     return Container(
       height: 28,
       padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: [
           Expanded(child: _buildUnitOption('Box', currentUnit == 'PIECE', () => onToggle('PIECE'))),
@@ -1512,7 +1830,7 @@ class _BillingScreenState extends State<BillingScreen> {
       child: Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFF5722) : Colors.transparent,
+          color: isSelected ? const Color(0xFF2563EB) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
@@ -1520,7 +1838,7 @@ class _BillingScreenState extends State<BillingScreen> {
           style: TextStyle(
             fontSize: 9.5,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? Colors.white : Colors.white60,
+            color: isSelected ? Colors.white : const Color(0xFF64748B),
           ),
         ),
       ),
@@ -1535,7 +1853,7 @@ class _BillingScreenState extends State<BillingScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           width: MediaQuery.of(context).size.width * 0.9,
@@ -1547,28 +1865,28 @@ class _BillingScreenState extends State<BillingScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withOpacity(0.12),
+                  color: const Color(0xFF10B981).withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_circle_rounded, color: Color(0xFF4CAF50), size: 54),
+                child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 54),
               ),
               const SizedBox(height: 16),
-              const Text('TRANSACTION COMPLETE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+              const Text('TRANSACTION COMPLETE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A))),
               const SizedBox(height: 4),
-              Text(
+              const Text(
                 'Invoice created successfully.',
-                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
               ),
               const SizedBox(height: 24),
-              const Divider(color: Colors.white10),
+              const Divider(color: Color(0xFFE2E8F0)),
               const SizedBox(height: 12),
               
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  Icon(Icons.print_outlined, color: Colors.white.withOpacity(0.3), size: 16),
+                  const Icon(Icons.print_outlined, color: Color(0xFF94A3B8), size: 16),
                   const SizedBox(width: 6),
-                  const Text('PRINT & EXPORT OPTIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Colors.white38)),
+                  const Text('PRINT & EXPORT OPTIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF64748B))),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1600,14 +1918,15 @@ class _BillingScreenState extends State<BillingScreen> {
                 height: 44,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.05),
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    foregroundColor: const Color(0xFF0F172A),
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () {
                     Navigator.pop(context);
                   },
-                  child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -1624,29 +1943,29 @@ class _BillingScreenState extends State<BillingScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
+          color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.04)),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: const Color(0xFFFF5722).withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, color: const Color(0xFFFF5722), size: 20),
+              decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: const Color(0xFF2563EB), size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF0F172A))),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10.5)),
+                  Text(subtitle, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10.5)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, size: 16, color: Colors.white.withOpacity(0.2)),
+            const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
           ],
         ),
       ),

@@ -25,26 +25,26 @@ class ProductCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), // Premium dark card surface
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white, // Crisp White card
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isOutOfStock
-              ? Colors.redAccent.withOpacity(0.3)
+              ? const Color(0xFFFCA5A5) // Soft red border
               : isLowStock
-                  ? Colors.orangeAccent.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.05),
-          width: 1.5,
+                  ? const Color(0xFFFDBA74) // Soft orange border
+                  : const Color(0xFFE2E8F0), // Cool grey slate border
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -57,33 +57,25 @@ class ProductCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Fixed sized beautiful image box
+                      // Image Container
                       Container(
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.03),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withOpacity(0.08)),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.white.withOpacity(0.05),
-                              Colors.transparent,
-                            ],
-                          ),
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: product.image != null && product.image!.isNotEmpty
                             ? ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(12),
                                 child: Image.network(
                                   product.image!,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) => const Icon(
                                     Icons.broken_image_outlined,
                                     size: 28,
-                                    color: Colors.white24,
+                                    color: Color(0xFF94A3B8),
                                   ),
                                   loadingBuilder: (context, child, loadingProgress) {
                                     if (loadingProgress == null) return child;
@@ -95,8 +87,8 @@ class ProductCard extends StatelessWidget {
                               )
                             : const Center(
                                 child: Icon(
-                                  Icons.local_fire_department,
-                                  color: Color(0xFFFF5722),
+                                  Icons.local_fire_department_outlined,
+                                  color: Color(0xFF2563EB), // Premium blue theme
                                   size: 32,
                                 ),
                               ),
@@ -110,28 +102,29 @@ class ProductCard extends StatelessWidget {
                             Text(
                               product.name,
                               style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 15.5,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: 0.2,
+                                color: Color(0xFF0F172A), // Slate 900
+                                letterSpacing: 0.1,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.06),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: const Color(0xFFEFF6FF), // Soft blue tint
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
                                     product.brand.toUpperCase(),
                                     style: const TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFFFFC107), // Gold accent
+                                      color: Color(0xFF2563EB), // Indigo blue
                                     ),
                                   ),
                                 ),
@@ -140,9 +133,9 @@ class ProductCard extends StatelessWidget {
                                   Flexible(
                                     child: Text(
                                       'SKU: ${product.sku}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.white.withOpacity(0.4),
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        color: Color(0xFF64748B),
                                         fontFamily: 'monospace',
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -161,7 +154,7 @@ class ProductCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.edit_outlined, color: Colors.blueAccent, size: 22),
+                              icon: const Icon(Icons.edit_outlined, color: Color(0xFF2563EB), size: 22),
                               onPressed: onEdit,
                               tooltip: 'Edit Product',
                               constraints: const BoxConstraints(),
@@ -169,7 +162,7 @@ class ProductCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 12),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline_outlined, color: Colors.redAccent, size: 22),
+                              icon: const Icon(Icons.delete_outline_outlined, color: Color(0xFFEF4444), size: 22),
                               onPressed: onDelete,
                               tooltip: 'Delete Product',
                               constraints: const BoxConstraints(),
@@ -179,7 +172,10 @@ class ProductCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const Divider(color: Colors.white10, height: 24, thickness: 1),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12.0),
+                    child: Divider(color: Color(0xFFE2E8F0), height: 1, thickness: 1),
+                  ),
                   // Price breakdown
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -187,26 +183,26 @@ class ProductCard extends StatelessWidget {
                       _priceColumn(
                         'PRICING',
                         currencyFormat.format(product.sellingPrice),
-                        color: const Color(0xFFFF5722),
+                        color: const Color(0xFF2563EB), // Theme Blue
                         isBold: true,
                       ),
                       if (product.mrp > 0)
                         _priceColumn(
                           'MRP',
                           currencyFormat.format(product.mrp),
-                          color: Colors.white38,
+                          color: const Color(0xFF64748B),
                         ),
                       if (isOwner)
                         _priceColumn(
-                          'PURCHASE COST',
+                          'PURCHASE',
                           currencyFormat.format(product.purchasePrice),
-                          color: const Color(0xFF4CAF50), // Emerald green
+                          color: const Color(0xFF16A34A), // Emerald green
                         ),
                       if (isOwner)
                         _priceColumn(
                           'MARGIN',
                           currencyFormat.format(product.sellingPrice - product.purchasePrice),
-                          color: const Color(0xFFFFC107),
+                          color: const Color(0xFFD97706), // Amber
                         ),
                     ],
                   ),
@@ -226,37 +222,37 @@ class ProductCard extends StatelessWidget {
     IconData icon;
 
     if (isOutOfStock) {
-      tagColor = Colors.redAccent.withOpacity(0.1);
-      textColor = Colors.redAccent;
+      tagColor = const Color(0xFFFEF2F2); // Soft red
+      textColor = const Color(0xFFEF4444);
       text = 'OUT OF STOCK';
       icon = Icons.cancel_outlined;
     } else if (isLowStock) {
-      tagColor = Colors.orangeAccent.withOpacity(0.1);
-      textColor = Colors.orangeAccent;
+      tagColor = const Color(0xFFFFF7ED); // Soft orange
+      textColor = const Color(0xFFF97316);
       text = 'LOW STOCK ($quantity left)';
       icon = Icons.warning_amber_outlined;
     } else {
-      tagColor = Colors.green.withOpacity(0.1);
-      textColor = const Color(0xFF4CAF50);
+      tagColor = const Color(0xFFF0FDF4); // Soft green
+      textColor = const Color(0xFF16A34A);
       text = 'IN STOCK ($quantity available)';
       icon = Icons.check_circle_outline;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: tagColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: textColor, size: 14),
-          const SizedBox(width: 6),
+          Icon(icon, color: textColor, size: 13),
+          const SizedBox(width: 4),
           Text(
             text,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
               color: textColor,
             ),
@@ -277,10 +273,10 @@ class ProductCard extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 9,
             fontWeight: FontWeight.bold,
-            color: Colors.white.withOpacity(0.3),
+            color: Color(0xFF94A3B8), // Slate 400
             letterSpacing: 0.5,
           ),
         ),
@@ -288,9 +284,9 @@ class ProductCard extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontSize: isBold ? 15 : 13,
+            fontSize: isBold ? 14 : 12.5,
             fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            color: color,
+            color: color ?? const Color(0xFF334155),
           ),
         ),
       ],

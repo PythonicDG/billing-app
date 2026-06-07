@@ -27,6 +27,7 @@ class _ProductFormState extends State<ProductForm> {
   XFile? _pickedFile;
   Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
+  String? _selectedCategoryUuid;
 
   @override
   void initState() {
@@ -39,6 +40,7 @@ class _ProductFormState extends State<ProductForm> {
     _purchasePriceController = TextEditingController(text: widget.product?.purchasePrice.toString() ?? '');
     _stockQuantityController = TextEditingController(text: widget.product?.stockQuantity.toString() ?? '');
     _minStockLevelController = TextEditingController(text: widget.product?.minStockLevel.toString() ?? '10');
+    _selectedCategoryUuid = widget.product?.category;
   }
 
   @override
@@ -76,6 +78,7 @@ class _ProductFormState extends State<ProductForm> {
         'purchase_price': double.parse(_purchasePriceController.text),
         'stock_quantity': int.parse(_stockQuantityController.text),
         'min_stock_level': int.parse(_minStockLevelController.text),
+        'category': _selectedCategoryUuid ?? '',
       };
 
       final provider = Provider.of<ProductProvider>(context, listen: false);
@@ -127,8 +130,9 @@ class _ProductFormState extends State<ProductForm> {
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: Colors.white10,
+                      color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: _imageBytes != null
                         ? ClipRRect(
@@ -141,10 +145,10 @@ class _ProductFormState extends State<ProductForm> {
                                 child: Image.network(
                                   widget.product!.image!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 40, color: Colors.white24),
+                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image_outlined, size: 40, color: Color(0xFF94A3B8)),
                                 ),
                               )
-                            : const Icon(Icons.image_search, size: 40, color: Colors.white24),
+                            : const Icon(Icons.image_search_outlined, size: 40, color: Color(0xFF94A3B8)),
                   ),
                   const SizedBox(width: 20),
                   Column(
@@ -167,6 +171,57 @@ class _ProductFormState extends State<ProductForm> {
               _buildTextField(_nameController, 'Product Name'),
               _buildTextField(_brandController, 'Brand'),
               _buildTextField(_skuController, 'SKU (Optional)'),
+              
+              // Category Selection Dropdown
+              Consumer<ProductProvider>(
+                builder: (context, productProvider, _) {
+                  final categories = productProvider.categoriesList;
+                  final bool isValidSelected = _selectedCategoryUuid != null &&
+                      categories.any((c) => c.uuid == _selectedCategoryUuid);
+                  final String? currentVal = isValidSelected ? _selectedCategoryUuid : null;
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: currentVal,
+                            decoration: const InputDecoration(
+                              labelText: 'Category',
+                              hintText: 'Select Category',
+                            ),
+                            dropdownColor: Colors.white,
+                            style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13.5),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('No Category', style: TextStyle(color: Color(0xFF94A3B8))),
+                              ),
+                              ...categories.map((c) => DropdownMenuItem<String>(
+                                    value: c.uuid,
+                                    child: Text(c.name),
+                                  )),
+                            ],
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedCategoryUuid = val;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline, color: Color(0xFFD946EF)),
+                          tooltip: 'Add Category',
+                          onPressed: () => _showAddCategoryDialog(context),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              
               Row(
                 children: [
                   Expanded(child: _buildTextField(_purchasePriceController, 'Purchase Price', isNum: true)),
@@ -198,15 +253,82 @@ class _ProductFormState extends State<ProductForm> {
     );
   }
 
+  void _showAddCategoryDialog(BuildContext context) {
+    final TextEditingController catNameController = TextEditingController();
+    final TextEditingController catDescController = TextEditingController();
+    final dialogFormKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Add New Category'),
+          content: Form(
+            key: dialogFormKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: catNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Category Name',
+                    hintText: 'e.g. Fancy Shots',
+                  ),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Category name is required' : null,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: catDescController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (Optional)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (dialogFormKey.currentState!.validate()) {
+                  final provider = Provider.of<ProductProvider>(context, listen: false);
+                  final success = await provider.addCategory(
+                    catNameController.text.trim(),
+                    catDescController.text.trim(),
+                  );
+                  if (success) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Category added successfully')),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to add category')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildTextField(TextEditingController controller, String label, {bool isNum = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
         controller: controller,
         keyboardType: isNum ? TextInputType.number : TextInputType.text,
+        style: const TextStyle(color: Color(0xFF0F172A)),
         decoration: InputDecoration(
           labelText: label,
-          hintStyle: const TextStyle(color: Colors.white24),
+          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
         ),
         validator: (v) => v!.isEmpty && label != 'SKU (Optional)' ? 'Required' : null,
       ),

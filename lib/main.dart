@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,7 +13,16 @@ import 'screens/products_screen.dart';
 import 'screens/staff_screen.dart';
 import 'screens/billing_screen.dart';
 
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 void main() {
+  HttpOverrides.global = MyHttpOverrides();
   runApp(
     MultiProvider(
       providers: [
@@ -35,7 +45,7 @@ class VighnahartaApp extends StatelessWidget {
     
     return MaterialApp(
       title: 'Vighnaharta Fataka',
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       home: authProvider.isAuthenticated 
           ? const DashboardScreen() 
           : const LoginScreen(),

@@ -4,6 +4,22 @@ import 'package:flutter/material.dart';
 import '../api_service.dart';
 import '../constants.dart';
 
+class Category {
+  final String uuid;
+  final String name;
+  final String? description;
+
+  Category({required this.uuid, required this.name, this.description});
+
+  factory Category.fromJson(Map<String, dynamic> json) {
+    return Category(
+      uuid: (json['id'] ?? json['uuid'] ?? '').toString(),
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
+    );
+  }
+}
+
 class Product {
   final String uuid;
   final String name;
@@ -15,6 +31,8 @@ class Product {
   final int stockQuantity;
   final int minStockLevel;
   final String? image;
+  final String? category;
+  final String? categoryName;
 
   Product({
     required this.uuid,
@@ -27,6 +45,8 @@ class Product {
     required this.stockQuantity,
     required this.minStockLevel,
     this.image,
+    this.category,
+    this.categoryName,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -41,6 +61,8 @@ class Product {
       stockQuantity: int.tryParse(json['stock_quantity']?.toString() ?? '0') ?? 0,
       minStockLevel: int.tryParse(json['min_stock_level']?.toString() ?? '0') ?? 0,
       image: json['image']?.toString(),
+      category: json['category']?.toString(),
+      categoryName: json['category_name']?.toString(),
     );
   }
 }
@@ -48,19 +70,54 @@ class Product {
 class ProductProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   List<Product> _products = [];
+  List<Category> _categoriesList = [];
   String? _nextUrl;
   String? _previousUrl;
   bool _isLoading = false;
   String _searchQuery = '';
   String _ordering = 'created_at';
+  int? _pageSize;
 
   List<Product> get products => _products;
+  List<Category> get categoriesList => _categoriesList;
   bool get isLoading => _isLoading;
   bool get hasNext => _nextUrl != null;
   bool get hasPrevious => _previousUrl != null;
 
-  Future<void> fetchProducts({bool initial = true, String? url}) async {
+  Future<void> fetchCategories() async {
+    try {
+      final response = await _apiService.get('/api/products/categories/');
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        _categoriesList = data.map((c) => Category.fromJson(c)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error fetching categories: $e');
+    }
+  }
+
+  Future<bool> addCategory(String name, String? description) async {
+    try {
+      final response = await _apiService.post('/api/products/categories/', {
+        'name': name,
+        'description': description ?? '',
+      });
+      if (response.statusCode == 201) {
+        await fetchCategories();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Error adding category: $e');
+    }
+    return false;
+  }
+
+  Future<void> fetchProducts({bool initial = true, String? url, int? pageSize}) async {
     _isLoading = true;
+    if (pageSize != null) {
+      _pageSize = pageSize;
+    }
     if (initial) {
       _products = [];
     }
@@ -72,6 +129,7 @@ class ProductProvider with ChangeNotifier {
         queryParams: url == null ? {
           'search': _searchQuery,
           'ordering': _ordering,
+          if (_pageSize != null) 'page_size': _pageSize.toString(),
         } : null,
       );
 

@@ -38,7 +38,7 @@ class _StaffScreenState extends State<StaffScreen> {
       drawer: AppDrawer(currentRole: authProvider.role ?? 'OWNER'),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateStaffDialog(context),
-        backgroundColor: const Color(0xFFFF5722),
+        backgroundColor: const Color(0xFF2563EB),
         child: const Icon(Icons.add, color: Colors.white),
       ),
       body: staffProvider.isLoading
@@ -48,9 +48,9 @@ class _StaffScreenState extends State<StaffScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.people_outline, size: 80, color: Colors.white24),
+                      const Icon(Icons.people_outline_outlined, size: 80, color: Color(0xFF94A3B8)),
                       const SizedBox(height: 16),
-                      const Text('No staff found', style: TextStyle(color: Colors.white54, fontSize: 18)),
+                      const Text('No staff found', style: TextStyle(color: Color(0xFF475569), fontSize: 18, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () => staffProvider.fetchStaffList(),
@@ -69,33 +69,46 @@ class _StaffScreenState extends State<StaffScreen> {
                       final initials = staff.username.isNotEmpty ? staff.username[0].toUpperCase() : '?';
 
                       return Card(
-                        elevation: 4,
+                        elevation: 1,
                         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+                        ),
+                        color: Colors.white,
                         child: ListTile(
                           contentPadding: const EdgeInsets.all(16),
                           leading: CircleAvatar(
-                            backgroundColor: Color(staff.isActive ? 0xFFFF5722 : 0xFF424242),
-                            child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            backgroundColor: Color(staff.isActive ? 0xFF2563EB : 0xFFE2E8F0),
+                            child: Text(
+                              initials,
+                              style: TextStyle(
+                                color: staff.isActive ? Colors.white : const Color(0xFF94A3B8),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                          title: Text(staff.username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          title: Text(
+                            staff.username,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF0F172A)),
+                          ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 4),
-                              Text(staff.email, style: const TextStyle(color: Colors.white70)),
+                              Text(staff.email, style: const TextStyle(color: Color(0xFF475569), fontSize: 13)),
                               const SizedBox(height: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: staff.role == 'STAFF' ? Colors.orange.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                                  color: staff.role == 'STAFF' ? const Color(0xFFFFF7ED) : const Color(0xFFF0FDF4),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   staff.role,
                                   style: TextStyle(
                                     fontSize: 10,
-                                    color: staff.role == 'STAFF' ? Colors.orange : Colors.green,
+                                    color: staff.role == 'STAFF' ? const Color(0xFFF97316) : const Color(0xFF16A34A),
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1.2,
                                   ),
@@ -109,11 +122,11 @@ class _StaffScreenState extends State<StaffScreen> {
                               if (staff.isActive)
                                 IconButton(
                                   onPressed: () => _confirmDeactivate(context, staff),
-                                  icon: const Icon(Icons.person_off_outlined, color: Colors.redAccent),
+                                  icon: const Icon(Icons.person_off_outlined, color: Color(0xFFEF4444)),
                                   tooltip: 'Deactivate',
                                 )
                               else
-                                const Icon(Icons.block, color: Colors.white24),
+                                const Icon(Icons.block_outlined, color: Color(0xFF94A3B8)),
                             ],
                           ),
                         ),
@@ -128,16 +141,21 @@ class _StaffScreenState extends State<StaffScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Deactivate Staff'),
-        content: Text('Are you sure you want to deactivate ${staff.username}?'),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Deactivate Staff', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to deactivate ${staff.username}?', style: const TextStyle(color: Color(0xFF475569))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
           TextButton(
             onPressed: () {
               Provider.of<StaffProvider>(context, listen: false).deactivateStaff(staff.userId);
               Navigator.pop(context);
             },
-            child: const Text('Confirm', style: TextStyle(color: Colors.red)),
+            child: const Text('Confirm', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -154,6 +172,10 @@ class _StaffScreenState extends State<StaffScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
         child: Form(
@@ -161,7 +183,7 @@ class _StaffScreenState extends State<StaffScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Create Staff', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text('Create Staff', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _usernameController,

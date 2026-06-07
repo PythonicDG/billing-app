@@ -16,11 +16,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
   final _searchController = TextEditingController();
   String _activeOrdering = 'created_at';
 
+  // Pagination State
+  int _currentPage = 1;
+  static const int _itemsPerPage = 12;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ProductProvider>(context, listen: false).fetchProducts();
+      final productProvider = Provider.of<ProductProvider>(context, listen: false);
+      productProvider.fetchProducts(pageSize: 100);
+      productProvider.fetchCategories();
     });
   }
 
@@ -39,11 +45,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.inventory_2_outlined, color: Color(0xFFFF5722)),
+            Icon(Icons.inventory_2_outlined, color: Color(0xFF2563EB)),
             SizedBox(width: 8),
             Text(
               'Inventory Dashboard',
-              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A)),
             ),
           ],
         ),
@@ -58,11 +64,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_outlined),
             tooltip: 'Refresh',
-            onPressed: () => productProvider.fetchProducts(),
+            onPressed: () {
+              productProvider.fetchProducts(pageSize: 100);
+              setState(() {
+                _currentPage = 1;
+              });
+            },
           ),
           if (isOwner)
             IconButton(
-              icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFF5722)),
+              icon: const Icon(Icons.add_circle_outline, color: Color(0xFF2563EB)),
               tooltip: 'Add Firecracker',
               onPressed: () {
                 _showProductForm(context);
@@ -78,11 +89,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ? Padding(
               padding: const EdgeInsets.only(bottom: 60.0),
               child: FloatingActionButton.extended(
-                backgroundColor: const Color(0xFFFF5722),
+                backgroundColor: const Color(0xFF2563EB),
                 onPressed: () => _showProductForm(context),
                 icon: const Icon(Icons.add, color: Colors.white),
                 label: const Text('ADD PRODUCT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                elevation: 6,
+                elevation: 4,
               ),
             )
           : null,
@@ -95,48 +106,57 @@ class _ProductsScreenState extends State<ProductsScreen> {
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 8,
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(fontSize: 14.5),
+                style: const TextStyle(fontSize: 14.5, color: Color(0xFF0F172A)),
                 decoration: InputDecoration(
-                  hintText: 'Search by firecracker name, brand, or SKU...',
-                  prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFFFF5722)),
+                  hintText: 'Search by firecracker name, category, brand, or SKU...',
+                  prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFF2563EB)),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear_outlined, size: 20),
+                          icon: const Icon(Icons.clear_outlined, size: 20, color: Color(0xFF64748B)),
                           onPressed: () {
                             _searchController.clear();
                             productProvider.setSearch('');
-                            setState(() {});
+                            setState(() {
+                              _currentPage = 1;
+                            });
                           },
                         )
                       : null,
                   filled: true,
-                  fillColor: const Color(0xFF1E1E1E),
+                  fillColor: Colors.white,
                   contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.05)),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFFFF5722), width: 1.5),
+                    borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
                   ),
                 ),
                 onChanged: (value) {
-                  setState(() {}); // Repaint to show/hide clear button
+                  setState(() {
+                    _currentPage = 1;
+                  });
                 },
-                onSubmitted: (value) => productProvider.setSearch(value),
+                onSubmitted: (value) {
+                  productProvider.setSearch(value);
+                  setState(() {
+                    _currentPage = 1;
+                  });
+                },
               ),
             ),
           ),
@@ -149,17 +169,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
               children: [
                 Text(
                   'Products listed: ${productProvider.products.length}',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                  style: const TextStyle(
+                    color: Color(0xFF64748B), // Slate 500
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (_searchController.text.isNotEmpty)
-                  Text(
+                  const Text(
                     'Search filters active',
                     style: TextStyle(
-                      color: const Color(0xFFFFC107).withOpacity(0.8),
+                      color: Color(0xFFD97706), // Amber margin/filter
                       fontSize: 12.5,
                       fontWeight: FontWeight.bold,
                     ),
@@ -173,112 +193,216 @@ class _ProductsScreenState extends State<ProductsScreen> {
           Expanded(
             child: productProvider.isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFFF5722)),
+                    child: CircularProgressIndicator(color: Color(0xFF2563EB)),
                   )
                 : productProvider.products.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.hourglass_empty_outlined,
                               size: 64,
-                              color: Colors.white.withOpacity(0.2),
+                              color: Color(0xFF94A3B8), // Muted slate 400
                             ),
                             const SizedBox(height: 16),
                             Text(
                               'No products found',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 17,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white.withOpacity(0.6),
+                                color: const Color(0xFF475569).withOpacity(0.8),
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text(
+                            const Text(
                               'Try modifying your search query or seeding new data.',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.white.withOpacity(0.35),
+                                color: Color(0xFF94A3B8),
                               ),
                             ),
                           ],
                         ),
                       )
-                    : GridView.builder(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          childAspectRatio: childAspectRatio,
-                          mainAxisSpacing: 4,
-                          crossAxisSpacing: 4,
-                        ),
-                        itemCount: productProvider.products.length,
-                        itemBuilder: (context, index) {
-                          final product = productProvider.products[index];
-                          return ProductCard(
-                            product: product,
-                            isOwner: isOwner,
-                            onEdit: () => _showProductForm(context, product: product),
-                            onDelete: () => _confirmDelete(context, product),
-                          );
-                        },
-                      ),
+                    : (() {
+                        final displayedProducts = productProvider.products;
+                        final totalItems = displayedProducts.length;
+                        final totalPages = (totalItems / _itemsPerPage).ceil();
+
+                        if (_currentPage > totalPages && totalPages > 0) {
+                          _currentPage = totalPages;
+                        } else if (_currentPage < 1) {
+                          _currentPage = 1;
+                        }
+
+                        final startIndex = (_currentPage - 1) * _itemsPerPage;
+                        final endIndex = startIndex + _itemsPerPage;
+                        final paginatedProducts = totalItems == 0
+                            ? <Product>[]
+                            : displayedProducts.sublist(
+                                startIndex,
+                                endIndex > totalItems ? totalItems : endIndex,
+                              );
+
+                        return Column(
+                          children: [
+                            Expanded(
+                              child: GridView.builder(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  childAspectRatio: childAspectRatio,
+                                  mainAxisSpacing: 4,
+                                  crossAxisSpacing: 4,
+                                ),
+                                itemCount: paginatedProducts.length,
+                                itemBuilder: (context, index) {
+                                  final product = paginatedProducts[index];
+                                  return ProductCard(
+                                    product: product,
+                                    isOwner: isOwner,
+                                    onEdit: () => _showProductForm(context, product: product),
+                                    onDelete: () => _confirmDelete(context, product),
+                                  );
+                                },
+                              ),
+                            ),
+                            if (totalPages > 1)
+                              _buildPagination(totalPages),
+                          ],
+                        );
+                      })(),
           ),
-          
-          // Pagination Controls
-          if (productProvider.products.isNotEmpty)
-            _buildPagination(productProvider),
         ],
       ),
     );
   }
 
-  Widget _buildPagination(ProductProvider productProvider) {
+  Widget _buildPagination(int totalPages) {
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF161616),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.04))),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.05),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
-            ),
-            onPressed: productProvider.previousUrl != null
-                ? () => productProvider.fetchProducts(url: productProvider.previousUrl)
+          // PREVIOUS button
+          InkWell(
+            onTap: _currentPage > 1
+                ? () {
+                    setState(() {
+                      _currentPage--;
+                    });
+                  }
                 : null,
-            icon: const Icon(Icons.chevron_left_outlined, size: 20),
-            label: const Text('PREVIOUS'),
-          ),
-          Text(
-            'Page Navigation',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withOpacity(0.4),
-              fontWeight: FontWeight.bold,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _currentPage > 1 ? const Color(0xFFEFF6FF) : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.chevron_left_outlined,
+                    size: 18,
+                    color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'PREV',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.05),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
-            ),
-            onPressed: productProvider.nextUrl != null
-                ? () => productProvider.fetchProducts(url: productProvider.nextUrl)
+
+          // Numbered page selectors
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(totalPages, (index) {
+              final pageNum = index + 1;
+              final isCurrent = pageNum == _currentPage;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _currentPage = pageNum;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isCurrent ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isCurrent ? Colors.transparent : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Text(
+                      '$pageNum',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: isCurrent ? Colors.white : const Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+
+          // NEXT button
+          InkWell(
+            onTap: _currentPage < totalPages
+                ? () {
+                    setState(() {
+                      _currentPage++;
+                    });
+                  }
                 : null,
-            icon: const Text('NEXT'),
-            label: const Icon(Icons.chevron_right_outlined, size: 20),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _currentPage < totalPages ? const Color(0xFFEFF6FF) : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'NEXT',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right_outlined,
+                    size: 18,
+                    color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -288,7 +412,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void _showSortOptions(BuildContext context, ProductProvider provider) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -302,21 +426,24 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 children: [
                   const Text(
                     'Sort Inventory By',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 20),
+                    icon: const Icon(Icons.close, size: 20, color: Color(0xFF64748B)),
                     onPressed: () => Navigator.pop(context),
                   )
                 ],
               ),
-              const Divider(color: Colors.white10),
+              const Divider(color: Color(0xFFE2E8F0)),
               _sortTile(
                 title: 'Newest Added First',
                 icon: Icons.calendar_month_outlined,
                 active: _activeOrdering == 'created_at',
                 onTap: () {
-                  _activeOrdering = 'created_at';
+                  setState(() {
+                    _activeOrdering = 'created_at';
+                    _currentPage = 1;
+                  });
                   provider.setOrdering('created_at');
                   Navigator.pop(context);
                 },
@@ -326,7 +453,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 icon: Icons.trending_up_outlined,
                 active: _activeOrdering == 'selling_price',
                 onTap: () {
-                  _activeOrdering = 'selling_price';
+                  setState(() {
+                    _activeOrdering = 'selling_price';
+                    _currentPage = 1;
+                  });
                   provider.setOrdering('selling_price');
                   Navigator.pop(context);
                 },
@@ -336,7 +466,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 icon: Icons.trending_down_outlined,
                 active: _activeOrdering == '-selling_price',
                 onTap: () {
-                  _activeOrdering = '-selling_price';
+                  setState(() {
+                    _activeOrdering = '-selling_price';
+                    _currentPage = 1;
+                  });
                   provider.setOrdering('-selling_price');
                   Navigator.pop(context);
                 },
@@ -346,7 +479,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 icon: Icons.warehouse_outlined,
                 active: _activeOrdering == 'stock_quantity',
                 onTap: () {
-                  _activeOrdering = 'stock_quantity';
+                  setState(() {
+                    _activeOrdering = 'stock_quantity';
+                    _currentPage = 1;
+                  });
                   provider.setOrdering('stock_quantity');
                   Navigator.pop(context);
                 },
@@ -365,15 +501,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: active ? const Color(0xFFFF5722) : Colors.white60),
+      leading: Icon(icon, color: active ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
       title: Text(
         title,
         style: TextStyle(
           fontWeight: active ? FontWeight.bold : FontWeight.normal,
-          color: active ? const Color(0xFFFF5722) : Colors.white70,
+          color: active ? const Color(0xFF2563EB) : const Color(0xFF334155),
         ),
       ),
-      trailing: active ? const Icon(Icons.check, color: Color(0xFFFF5722)) : null,
+      trailing: active ? const Icon(Icons.check, color: Color(0xFF2563EB)) : null,
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
@@ -383,7 +519,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -398,23 +534,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_outlined, color: Colors.redAccent),
+            Icon(Icons.warning_amber_outlined, color: Color(0xFFEF4444)),
             SizedBox(width: 8),
-            Text('Delete Product'),
+            Text('Delete Product', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
           ],
         ),
         content: RichText(
           text: TextSpan(
-            style: const TextStyle(color: Colors.white70, fontSize: 14.5),
+            style: const TextStyle(color: Color(0xFF475569), fontSize: 14.5),
             children: [
               const TextSpan(text: 'Are you sure you want to permanently delete '),
               TextSpan(
                 text: product.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
               ),
               const TextSpan(text: '? This action cannot be undone.'),
             ],
@@ -423,11 +559,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
+              backgroundColor: const Color(0xFFEF4444),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
             onPressed: () {
@@ -449,14 +585,15 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      backgroundColor: Colors.white,
       child: ListView(
         children: [
           DrawerHeader(
-            decoration: const BoxDecoration(color: Color(0xFFFF5722)),
+            decoration: const BoxDecoration(color: Color(0xFF2563EB)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.local_fire_department, size: 48, color: Colors.white),
+                const Icon(Icons.local_fire_department_outlined, size: 48, color: Colors.white),
                 const SizedBox(height: 16),
                 const Text('Vighnaharta Fataka', style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
                 Text(currentRole, style: const TextStyle(color: Colors.white70)),

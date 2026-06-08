@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color primaryColor = Color(0xFF2563EB); // Premium Indigo Blue
-  static const Color accentColor = Color(0xFF4F46E5); // Indigo Accent
-  static const Color backgroundColor = Color(0xFFF8FAFC); // Slate-50 Page Background
-  static const Color cardColor = Colors.white; // Crisp Solid White Cards
-  static const Color textColor = Color(0xFF0F172A); // Slate-900 Primary Text
-  static const Color subtitleColor = Color(0xFF475569); // Slate-600 Subtext
-  static const Color borderColor = Color(0xFFE2E8F0); // Slate-200 Border Color
+  static const Color primaryColor = Color(0xFF0F2C59); // Zoho corporate slate blue
+  static const Color accentColor = Color(0xFF006FDF); // Zoho active primary blue
+  static const Color backgroundColor = Color(0xFFF5F7FA); // Zoho light grey panel background
+  static const Color cardColor = Colors.white;
+  static const Color textColor = Color(0xFF1E293B); // Slate-800
+  static const Color subtitleColor = Color(0xFF64748B); // Slate-500
+  static const Color borderColor = Color(0xFFD1D5DB); // Zoho clean border grey
 
   static ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,

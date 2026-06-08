@@ -33,6 +33,9 @@ class Product {
   final String? image;
   final String? category;
   final String? categoryName;
+  final int noOfCase;
+  final int centInPerCs;
+  final double totalStockInCent;
 
   Product({
     required this.uuid,
@@ -47,6 +50,9 @@ class Product {
     this.image,
     this.category,
     this.categoryName,
+    required this.noOfCase,
+    required this.centInPerCs,
+    required this.totalStockInCent,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -63,6 +69,9 @@ class Product {
       image: json['image']?.toString(),
       category: json['category']?.toString(),
       categoryName: json['category_name']?.toString(),
+      noOfCase: int.tryParse(json['no_of_case']?.toString() ?? '0') ?? 0,
+      centInPerCs: int.tryParse(json['cent_in_per_cs']?.toString() ?? '0') ?? 0,
+      totalStockInCent: double.tryParse(json['total_stock_in_cent']?.toString() ?? '0.0') ?? 0.0,
     );
   }
 }

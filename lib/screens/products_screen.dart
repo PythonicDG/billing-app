@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../product_provider.dart';
 import '../auth_provider.dart';
-import '../widgets/product_card.dart';
 import '../widgets/product_form.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -15,6 +15,7 @@ class ProductsScreen extends StatefulWidget {
 class _ProductsScreenState extends State<ProductsScreen> {
   final _searchController = TextEditingController();
   String _activeOrdering = 'created_at';
+  Timer? _debounce;
 
   // Pagination State
   int _currentPage = 1;
@@ -31,15 +32,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final productProvider = Provider.of<ProductProvider>(context);
     final authProvider = Provider.of<AuthProvider>(context);
     final isOwner = authProvider.role?.toUpperCase() == 'OWNER';
 
-    double screenWidth = MediaQuery.of(context).size.width;
-    // Calculate columns: 1 for mobile, 2 for tablet, 3 for desktop
-    int crossAxisCount = screenWidth < 720 ? 1 : (screenWidth < 1200 ? 2 : 3);
-    double childAspectRatio = screenWidth < 480 ? 1.7 : 1.9;
+
 
     return Scaffold(
       appBar: AppBar(
@@ -116,7 +121,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 controller: _searchController,
                 style: const TextStyle(fontSize: 14.5, color: Color(0xFF0F172A)),
                 decoration: InputDecoration(
-                  hintText: 'Search by firecracker name, category, brand, or SKU...',
+                  hintText: 'Search by product name or brand...',
                   prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFF2563EB)),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
@@ -150,8 +155,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   setState(() {
                     _currentPage = 1;
                   });
+                  if (_debounce?.isActive ?? false) _debounce!.cancel();
+                  _debounce = Timer(const Duration(milliseconds: 250), () {
+                    productProvider.setSearch(value);
+                  });
                 },
                 onSubmitted: (value) {
+                  if (_debounce?.isActive ?? false) _debounce!.cancel();
                   productProvider.setSearch(value);
                   setState(() {
                     _currentPage = 1;
@@ -245,35 +255,112 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 endIndex > totalItems ? totalItems : endIndex,
                               );
 
-                        return Column(
-                          children: [
-                            Expanded(
-                              child: GridView.builder(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: crossAxisCount,
-                                  childAspectRatio: childAspectRatio,
-                                  mainAxisSpacing: 4,
-                                  crossAxisSpacing: 4,
-                                ),
-                                itemCount: paginatedProducts.length,
-                                itemBuilder: (context, index) {
-                                  final product = paginatedProducts[index];
-                                  return ProductCard(
-                                    product: product,
-                                    isOwner: isOwner,
-                                    onEdit: () => _showProductForm(context, product: product),
-                                    onDelete: () => _confirmDelete(context, product),
-                                  );
-                                },
-                              ),
-                            ),
-                            if (totalPages > 1)
-                              _buildPagination(totalPages),
-                          ],
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final double estimatedContentWidth = isOwner ? 760 : 560;
+                            final double availableSpacingWidth = constraints.maxWidth - estimatedContentWidth;
+                            final double columnSpacing = availableSpacingWidth > 0 
+                                ? (availableSpacingWidth / (isOwner ? 8 : 6)).clamp(16.0, 120.0) 
+                                : 16.0;
+
+                            return Column(
+                              children: [
+                                 Expanded(
+                                   child: SingleChildScrollView(
+                                     scrollDirection: Axis.vertical,
+                                     child: SingleChildScrollView(
+                                       scrollDirection: Axis.horizontal,
+                                       child: ConstrainedBox(
+                                         constraints: BoxConstraints(
+                                           minWidth: constraints.maxWidth,
+                                         ),
+                                         child: DataTable(
+                                           columnSpacing: columnSpacing,
+                                           headingRowColor: WidgetStateProperty.all(const Color(0xFFF1F5F9)),
+                                           dataRowMinHeight: 52,
+                                           dataRowMaxHeight: 52,
+                                           horizontalMargin: 20,
+                                           columns: [
+                                             const DataColumn(label: Text('PRODUCT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
+                                             const DataColumn(label: Text('BRAND', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
+                                             if (isOwner)
+                                               const DataColumn(label: Text('PURCHASE PRICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
+                                             const DataColumn(label: Text('SELLING PRICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
+                                             const DataColumn(label: Text('NO. OF CASE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
+                                             const DataColumn(label: Text('CENT IN PER CS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
+                                             const DataColumn(label: Text('TOTAL STOCK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
+                                             if (isOwner)
+                                               const DataColumn(label: Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
+                                           ],
+                                           rows: paginatedProducts.map((product) {
+                                             final isOutOfStock = product.totalStockInCent <= 0;
+                                             return DataRow(
+                                               cells: [
+                                                 DataCell(Text(product.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5))),
+                                                 DataCell(
+                                                   Container(
+                                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                     decoration: BoxDecoration(
+                                                       color: const Color(0xFFEFF6FF),
+                                                       borderRadius: BorderRadius.circular(6),
+                                                     ),
+                                                     child: Text(
+                                                       product.brand.toUpperCase(),
+                                                       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                                                     ),
+                                                   ),
+                                                 ),
+                                                 if (isOwner)
+                                                   DataCell(Text('₹${product.purchasePrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12))),
+                                                 DataCell(Text('₹${product.sellingPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF2563EB)))),
+                                                 DataCell(Text('${product.noOfCase} cs', style: const TextStyle(fontSize: 12))),
+                                                 DataCell(Text('${product.centInPerCs} cent', style: const TextStyle(fontSize: 12))),
+                                                 DataCell(
+                                                   Text(
+                                                     '${product.totalStockInCent.toStringAsFixed(1)} cent',
+                                                     style: TextStyle(
+                                                       fontWeight: FontWeight.bold,
+                                                       fontSize: 12,
+                                                       color: isOutOfStock ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
+                                                     ),
+                                                   ),
+                                                 ),
+                                                 if (isOwner)
+                                                   DataCell(
+                                                     Row(
+                                                       mainAxisSize: MainAxisSize.min,
+                                                       children: [
+                                                         IconButton(
+                                                           icon: const Icon(Icons.edit_outlined, color: Color(0xFF2563EB), size: 18),
+                                                           onPressed: () => _showProductForm(context, product: product),
+                                                           constraints: const BoxConstraints(),
+                                                           padding: const EdgeInsets.all(4),
+                                                         ),
+                                                         IconButton(
+                                                           icon: const Icon(Icons.delete_outline_outlined, color: Color(0xFFEF4444), size: 18),
+                                                           onPressed: () => _confirmDelete(context, product),
+                                                           constraints: const BoxConstraints(),
+                                                           padding: const EdgeInsets.all(4),
+                                                         ),
+                                                       ],
+                                                     ),
+                                                   ),
+                                               ],
+                                             );
+                                           }).toList(),
+                                         ),
+                                       ),
+                                     ),
+                                   ),
+                                 ),
+                              ],
+                            );
+                          },
                         );
                       })(),
           ),
+          if (_currentPage > 0 && (_currentPage <= ((productProvider.products.length / _itemsPerPage).ceil() == 0 ? 1 : (productProvider.products.length / _itemsPerPage).ceil())))
+             _buildPagination((productProvider.products.length / _itemsPerPage).ceil()),
         ],
       ),
     );

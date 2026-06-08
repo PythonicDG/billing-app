@@ -19,20 +19,17 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
-    final isLowStock = product.stockQuantity <= product.minStockLevel;
-    final isOutOfStock = product.stockQuantity <= 0;
+    final isOutOfStock = product.totalStockInCent <= 0;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white, // Crisp White card
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isOutOfStock
               ? const Color(0xFFFCA5A5) // Soft red border
-              : isLowStock
-                  ? const Color(0xFFFDBA74) // Soft orange border
-                  : const Color(0xFFE2E8F0), // Cool grey slate border
+              : const Color(0xFFE2E8F0), // Cool grey slate border
           width: 1.2,
         ),
         boxShadow: [
@@ -57,43 +54,26 @@ class ProductCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Image Container
+                      // Simple premium firecracker icon / status indicator instead of full image
                       Container(
-                        width: 80,
-                        height: 80,
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          color: isOutOfStock ? const Color(0xFFFEF2F2) : const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isOutOfStock ? const Color(0xFFFCA5A5) : const Color(0xFFBFDBFE),
+                          ),
                         ),
-                        child: product.image != null && product.image!.isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  product.image!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => const Icon(
-                                    Icons.broken_image_outlined,
-                                    size: 28,
-                                    color: Color(0xFF94A3B8),
-                                  ),
-                                  loadingBuilder: (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return const Center(
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    );
-                                  },
-                                ),
-                              )
-                            : const Center(
-                                child: Icon(
-                                  Icons.local_fire_department_outlined,
-                                  color: Color(0xFF2563EB), // Premium blue theme
-                                  size: 32,
-                                ),
-                              ),
+                        child: Center(
+                          child: Icon(
+                            isOutOfStock ? Icons.block_flipped : Icons.inventory_2_outlined,
+                            color: isOutOfStock ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
+                            size: 22,
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       // Details section
                       Expanded(
                         child: Column(
@@ -102,7 +82,7 @@ class ProductCard extends StatelessWidget {
                             Text(
                               product.name,
                               style: const TextStyle(
-                                fontSize: 15.5,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0F172A), // Slate 900
                                 letterSpacing: 0.1,
@@ -110,66 +90,63 @@ class ProductCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEFF6FF), // Soft blue tint
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    product.brand.toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF2563EB), // Indigo blue
-                                    ),
-                                  ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF), // Soft blue tint
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                product.brand.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2563EB),
                                 ),
-                                const SizedBox(width: 8),
-                                if (product.sku != null && product.sku!.isNotEmpty)
-                                  Flexible(
-                                    child: Text(
-                                      'SKU: ${product.sku}',
-                                      style: const TextStyle(
-                                        fontSize: 10.5,
-                                        color: Color(0xFF64748B),
-                                        fontFamily: 'monospace',
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                              ],
+                              ),
                             ),
-                            const SizedBox(height: 8),
-                            // Stock Status Tag
-                            _buildStockTag(isOutOfStock, isLowStock, product.stockQuantity),
                           ],
                         ),
                       ),
                       if (isOwner)
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.edit_outlined, color: Color(0xFF2563EB), size: 22),
+                              icon: const Icon(Icons.edit_outlined, color: Color(0xFF2563EB), size: 20),
                               onPressed: onEdit,
                               tooltip: 'Edit Product',
                               constraints: const BoxConstraints(),
-                              padding: const EdgeInsets.all(4),
+                              padding: const EdgeInsets.all(6),
                             ),
-                            const SizedBox(height: 12),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline_outlined, color: Color(0xFFEF4444), size: 22),
+                              icon: const Icon(Icons.delete_outline_outlined, color: Color(0xFFEF4444), size: 20),
                               onPressed: onDelete,
                               tooltip: 'Delete Product',
                               constraints: const BoxConstraints(),
-                              padding: const EdgeInsets.all(4),
+                              padding: const EdgeInsets.all(6),
                             ),
                           ],
                         ),
+                    ],
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12.0),
+                    child: Divider(color: Color(0xFFE2E8F0), height: 1, thickness: 1),
+                  ),
+                  // Attributes row (No. of case, Cent in per cs, Total Stock)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _infoColumn('NO. OF CASE', '${product.noOfCase} cs'),
+                      _infoColumn('CENT IN PER CS', '${product.centInPerCs} cent'),
+                      _infoColumn(
+                        'TOTAL STOCK',
+                        '${product.totalStockInCent.toStringAsFixed(1)} cent',
+                        valueColor: isOutOfStock ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
+                        isBold: true,
+                      ),
                     ],
                   ),
                   const Padding(
@@ -180,29 +157,17 @@ class ProductCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _priceColumn(
-                        'PRICING',
+                      _infoColumn(
+                        'SELLING PRICE',
                         currencyFormat.format(product.sellingPrice),
-                        color: const Color(0xFF2563EB), // Theme Blue
+                        valueColor: const Color(0xFF2563EB),
                         isBold: true,
                       ),
-                      if (product.mrp > 0)
-                        _priceColumn(
-                          'MRP',
-                          currencyFormat.format(product.mrp),
-                          color: const Color(0xFF64748B),
-                        ),
                       if (isOwner)
-                        _priceColumn(
-                          'PURCHASE',
+                        _infoColumn(
+                          'PURCHASE PRICE',
                           currencyFormat.format(product.purchasePrice),
-                          color: const Color(0xFF16A34A), // Emerald green
-                        ),
-                      if (isOwner)
-                        _priceColumn(
-                          'MARGIN',
-                          currencyFormat.format(product.sellingPrice - product.purchasePrice),
-                          color: const Color(0xFFD97706), // Amber
+                          valueColor: const Color(0xFF475569),
                         ),
                     ],
                   ),
@@ -215,57 +180,10 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStockTag(bool isOutOfStock, bool isLowStock, int quantity) {
-    Color tagColor;
-    Color textColor;
-    String text;
-    IconData icon;
-
-    if (isOutOfStock) {
-      tagColor = const Color(0xFFFEF2F2); // Soft red
-      textColor = const Color(0xFFEF4444);
-      text = 'OUT OF STOCK';
-      icon = Icons.cancel_outlined;
-    } else if (isLowStock) {
-      tagColor = const Color(0xFFFFF7ED); // Soft orange
-      textColor = const Color(0xFFF97316);
-      text = 'LOW STOCK ($quantity left)';
-      icon = Icons.warning_amber_outlined;
-    } else {
-      tagColor = const Color(0xFFF0FDF4); // Soft green
-      textColor = const Color(0xFF16A34A);
-      text = 'IN STOCK ($quantity available)';
-      icon = Icons.check_circle_outline;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: tagColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: textColor, size: 13),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _priceColumn(
+  Widget _infoColumn(
     String label,
     String value, {
-    Color? color,
+    Color? valueColor,
     bool isBold = false,
   }) {
     return Column(
@@ -280,13 +198,13 @@ class ProductCard extends StatelessWidget {
             letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 3),
         Text(
           value,
           style: TextStyle(
-            fontSize: isBold ? 14 : 12.5,
+            fontSize: isBold ? 13.5 : 12,
             fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            color: color ?? const Color(0xFF334155),
+            color: valueColor ?? const Color(0xFF334155),
           ),
         ),
       ],

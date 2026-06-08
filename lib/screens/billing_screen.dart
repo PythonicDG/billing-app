@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +21,7 @@ class _BillingScreenState extends State<BillingScreen> {
   final _customerPhoneController = TextEditingController();
   final _paidAmountController = TextEditingController();
   final _searchController = TextEditingController();
+  Timer? _debounce;
 
   // Map to hold controllers for each in-cart product quantity textfield to avoid focus/cursor jump
   final Map<String, TextEditingController> _qtyControllers = {};
@@ -51,6 +53,7 @@ class _BillingScreenState extends State<BillingScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     // Correctly dispose of all dynamically created quantity controllers
     for (var controller in _qtyControllers.values) {
       controller.dispose();
@@ -119,20 +122,6 @@ class _BillingScreenState extends State<BillingScreen> {
 
     // Apply dynamic filtering locally over loaded products
     List<Product> displayedProducts = productProvider.products;
-    if (_selectedCategory != 'ALL') {
-      final selectedCategoryObj = productProvider.categoriesList.firstWhere(
-        (c) => c.uuid == _selectedCategory,
-        orElse: () => Category(uuid: '', name: ''),
-      );
-      final selectedCategoryName = selectedCategoryObj.name;
-
-      displayedProducts = productProvider.products.where((p) {
-        if (p.category != null && p.category!.isNotEmpty) {
-          return p.category == _selectedCategory;
-        }
-        return _getProductCategory(p.name).toLowerCase() == selectedCategoryName.toLowerCase();
-      }).toList();
-    }
 
     double screenWidth = MediaQuery.of(context).size.width;
     bool isWidePOSLayout = screenWidth >= 1024;
@@ -278,7 +267,7 @@ class _BillingScreenState extends State<BillingScreen> {
     double width = MediaQuery.of(context).size.width;
     // Responsive columns
     int crossAxisCount = width < 500 ? 1 : (width < 900 ? 2 : (width < 1400 ? 2 : 3));
-    double childAspectRatio = width < 500 ? 1.6 : 0.64;
+    double childAspectRatio = width < 500 ? 1.7 : 1.35;
 
     // Local pagination calculations
     final totalItems = displayedProducts.length;
@@ -349,16 +338,21 @@ class _BillingScreenState extends State<BillingScreen> {
                       ),
                     ),
                     onChanged: (v) {
-                      setState(() {
-                        _currentPage = 1;
-                      });
-                    },
-                    onSubmitted: (v) {
-                      productProvider.setSearch(v);
-                      setState(() {
-                        _currentPage = 1;
-                      });
-                    },
+                       setState(() {
+                         _currentPage = 1;
+                       });
+                       if (_debounce?.isActive ?? false) _debounce!.cancel();
+                       _debounce = Timer(const Duration(milliseconds: 250), () {
+                         productProvider.setSearch(v);
+                       });
+                     },
+                     onSubmitted: (v) {
+                       if (_debounce?.isActive ?? false) _debounce!.cancel();
+                       productProvider.setSearch(v);
+                       setState(() {
+                         _currentPage = 1;
+                       });
+                     },
                   ),
                 ),
               ),
@@ -379,57 +373,6 @@ class _BillingScreenState extends State<BillingScreen> {
           ),
         ),
 
-        // Horizontal Category Scrolling Filter chips
-        SizedBox(
-          height: 48,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            itemCount: productProvider.categoriesList.length + 1,
-            itemBuilder: (context, index) {
-              final String catName;
-              final String catId;
-              if (index == 0) {
-                catName = 'ALL';
-                catId = 'ALL';
-              } else {
-                final cat = productProvider.categoriesList[index - 1];
-                catName = cat.name;
-                catId = cat.uuid;
-              }
-              final isSelected = _selectedCategory == catId;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(
-                    catName,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : const Color(0xFF475569),
-                    ),
-                  ),
-                  selected: isSelected,
-                  selectedColor: const Color(0xFF2563EB),
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  elevation: 0,
-                  pressElevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  side: BorderSide(
-                    color: isSelected ? Colors.transparent : const Color(0xFFE2E8F0),
-                  ),
-                  onSelected: (selected) {
-                    setState(() {
-                      _selectedCategory = catId;
-                      _currentPage = 1;
-                    });
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 4),
 
         // Products Grid
         Expanded(
@@ -447,15 +390,10 @@ class _BillingScreenState extends State<BillingScreen> {
                         ],
                       ),
                     )
-                  : GridView.builder(
+                  : ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        childAspectRatio: childAspectRatio,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                      ),
                       itemCount: paginatedProducts.length,
+                      separatorBuilder: (context, index) => const Divider(color: Color(0xFFE2E8F0), height: 1),
                       itemBuilder: (context, index) {
                         final product = paginatedProducts[index];
                         return _buildECommerceProductCard(product, billingProvider);
@@ -604,235 +542,150 @@ class _BillingScreenState extends State<BillingScreen> {
     final selectedUnit = isInCart ? cartItem!.unit : (_tempUnits[product.uuid] ?? 'PIECE');
     final currentPrice = selectedUnit == 'CENT' ? product.sellingPrice * 10 : product.sellingPrice;
     
-    final isOutOfStock = product.stockQuantity <= 0;
-    final isLowStock = product.stockQuantity <= product.minStockLevel && !isOutOfStock;
+    final isOutOfStock = product.totalStockInCent <= 0;
 
     return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isInCart
-              ? const Color(0xFF2563EB)
-              : const Color(0xFFE2E8F0),
-          width: isInCart ? 1.5 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 3))
-        ],
+        color: isInCart ? const Color(0xFFEFF6FF) : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Header aspect frame for product image
+          // Icon and Details
           Expanded(
-            flex: 11,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Container(
-                  color: const Color(0xFFF8FAFC),
-                  child: product.image != null && product.image!.isNotEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Image.network(
-                            product.image!,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image_outlined, size: 28, color: Color(0xFF94A3B8)),
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                            },
-                          ),
-                        )
-                      : const Center(
-                          child: Icon(Icons.local_fire_department_outlined, size: 36, color: Color(0xFF2563EB)),
-                        ),
-                ),
-                // Out of stock overlay
-                if (isOutOfStock)
-                  Container(
-                    color: Colors.white.withOpacity(0.85),
-                    alignment: Alignment.center,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFEF4444)),
-                      ),
-                      child: const Text(
-                        'SOLD OUT',
-                        style: TextStyle(color: Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          
-          // Details section
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            flex: 40,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   product.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.1, color: Color(0xFF0F172A)),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      product.brand,
-                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 10.5, fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        product.brand.toUpperCase(),
+                        style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                      ),
                     ),
-                    // Stock status text
+                    const SizedBox(width: 8),
                     Text(
-                      isOutOfStock
-                          ? 'Out of stock'
-                          : isLowStock
-                              ? 'Only ${product.stockQuantity} left'
-                              : '${product.stockQuantity} in stock',
+                      isOutOfStock ? 'Sold Out' : '${product.totalStockInCent.toStringAsFixed(1)} cent left',
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.bold,
-                        color: isOutOfStock
-                            ? const Color(0xFFEF4444)
-                            : isLowStock
-                                ? const Color(0xFFF97316)
-                                : const Color(0xFF16A34A),
+                        color: isOutOfStock ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                
-                // Price row
-                Row(
-                  children: [
-                    Text(
-                      currencyFormat.format(currentPrice),
-                      style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '/${selectedUnit == 'CENT' ? 'Cent' : 'Box'}',
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9.5, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+              ],
+            ),
+          ),
+          
+          // Pricing
+          Expanded(
+            flex: 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'RATE',
+                  style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
                 ),
-                const SizedBox(height: 8),
-
-                // Unit selection toggle
-                _buildUnitToggle(
-                  currentUnit: selectedUnit,
-                  onToggle: (newUnit) {
-                    if (isInCart) {
-                      billingProvider.toggleUnit(product.uuid);
-                    } else {
-                      setState(() {
-                        _tempUnits[product.uuid] = newUnit;
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-
-                // Elegant action button or quantity controls
-                SizedBox(
-                  height: 34,
-                  width: double.infinity,
-                  child: isInCart
-                      ? Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildQtyBtn(
-                                Icons.remove_outlined,
-                                () => billingProvider.updateQuantity(
-                                  product.uuid,
-                                  cartItem!.quantity - 1,
-                                  product.stockQuantity,
-                                ),
-                              ),
-                              // INLINE EDITABLE QUANTITY TEXTFIELD (Direct typing with no popups)
-                              SizedBox(
-                                width: 45,
-                                height: 26,
-                                child: Container(
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  ),
-                                  child: TextField(
-                                    controller: _getQuantityController(product.uuid, cartItem!.quantity),
-                                    keyboardType: TextInputType.number,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB)),
-                                    decoration: const InputDecoration(
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                    ),
-                                    onChanged: (value) {
-                                      if (value.isNotEmpty) {
-                                        final newQty = int.tryParse(value);
-                                        if (newQty != null && newQty > 0) {
-                                          billingProvider.updateQuantity(
-                                            product.uuid,
-                                            newQty,
-                                            product.stockQuantity,
-                                          );
-                                        }
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ),
-                              _buildQtyBtn(
-                                Icons.add_outlined,
-                                () => billingProvider.updateQuantity(
-                                  product.uuid,
-                                  cartItem!.quantity + 1,
-                                  product.stockQuantity,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: EdgeInsets.zero,
-                          ),
-                          onPressed: !isOutOfStock
-                              ? () => billingProvider.addToCart(product, unit: selectedUnit)
-                              : null,
-                          child: const Text(
-                             'ADD TO CART',
-                             style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ),
+                Text(
+                  currencyFormat.format(currentPrice),
+                  style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ],
             ),
-          )
+          ),
+          
+          // Unit Selection
+          Expanded(
+            flex: 20,
+            child: Center(
+              child: _buildUnitToggle(
+                currentUnit: selectedUnit,
+                onToggle: (newUnit) {
+                  if (isInCart) {
+                    billingProvider.toggleUnit(product.uuid);
+                  } else {
+                    setState(() {
+                      _tempUnits[product.uuid] = newUnit;
+                    });
+                  }
+                },
+              ),
+            ),
+          ),
+          
+          const SizedBox(width: 12),
+          
+          // Action Button / Qty Control
+          Expanded(
+            flex: 20,
+            child: SizedBox(
+              height: 32,
+              child: cartItem != null
+                  ? Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildQtyBtn(
+                            Icons.remove,
+                            () => billingProvider.updateQuantity(
+                              product.uuid,
+                              cartItem.quantity - 1,
+                              product.stockQuantity,
+                            ),
+                          ),
+                          Text(
+                            '${cartItem.quantity}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF2563EB)),
+                          ),
+                          _buildQtyBtn(
+                            Icons.add,
+                            () => billingProvider.updateQuantity(
+                              product.uuid,
+                              cartItem.quantity + 1,
+                              product.stockQuantity,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F2C59),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        padding: EdgeInsets.zero,
+                      ),
+                      onPressed: !isOutOfStock
+                          ? () => billingProvider.addToCart(product, unit: selectedUnit)
+                          : null,
+                      child: const Text(
+                        'ADD',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+            ),
+          ),
         ],
       ),
     );
@@ -1415,6 +1268,13 @@ class _BillingScreenState extends State<BillingScreen> {
                                     );
                                     if (preview != null) {
                                       _showThermalReceiptPreview(context, preview);
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Preview Failed: ${provider.errorMessage ?? "Unknown error"}'),
+                                          backgroundColor: const Color(0xFFEF4444),
+                                        ),
+                                      );
                                     }
                                   }
                                 },
@@ -1439,6 +1299,13 @@ class _BillingScreenState extends State<BillingScreen> {
                                     if (invoiceId != null) {
                                       Navigator.pop(context);
                                       _showSuccessWithDownload(context, provider, invoiceId);
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Creation Failed: ${provider.errorMessage ?? "Unknown error"}'),
+                                          backgroundColor: const Color(0xFFEF4444),
+                                        ),
+                                      );
                                     }
                                   }
                                 },
@@ -1566,7 +1433,7 @@ class _BillingScreenState extends State<BillingScreen> {
                   final pProvider = Provider.of<ProductProvider>(context, listen: false);
                   final matchingProduct = pProvider.products.firstWhere(
                     (p) => p.uuid == item['product'],
-                    orElse: () => Product(uuid: '', name: 'Firecracker Item', brand: '', sellingPrice: 0, mrp: 0, purchasePrice: 0, stockQuantity: 0, minStockLevel: 0),
+                    orElse: () => Product(uuid: '', name: 'Firecracker Item', brand: '', sellingPrice: 0, mrp: 0, purchasePrice: 0, stockQuantity: 0, minStockLevel: 0, noOfCase: 0, centInPerCs: 0, totalStockInCent: 0.0),
                   );
 
                   double totPrice = (double.tryParse(item['quantity']?.toString() ?? '0') ?? 0.0) * (double.tryParse(item['unit_price']?.toString() ?? '0') ?? 0.0);
@@ -1579,7 +1446,7 @@ class _BillingScreenState extends State<BillingScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            matchingProduct.name,
+                            "${matchingProduct.name}${matchingProduct.brand.isNotEmpty ? ' (${matchingProduct.brand})' : ''}",
                             style: const TextStyle(color: Colors.black87, fontSize: 10.5, fontFamily: 'monospace'),
                             maxLines: 2,
                           ),

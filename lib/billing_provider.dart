@@ -10,8 +10,16 @@ class Customer {
   final String phone;
   final String? email;
   final String? address;
+  final double outstandingBalance;
 
-  Customer({required this.id, required this.name, required this.phone, this.email, this.address});
+  Customer({
+    required this.id,
+    required this.name,
+    required this.phone,
+    this.email,
+    this.address,
+    this.outstandingBalance = 0.0,
+  });
 
   factory Customer.fromJson(Map<String, dynamic> json) {
     return Customer(
@@ -20,6 +28,7 @@ class Customer {
       phone: json['phone']?.toString() ?? '',
       email: json['email']?.toString(),
       address: json['address']?.toString(),
+      outstandingBalance: double.tryParse(json['outstanding_balance']?.toString() ?? '0.0') ?? 0.0,
     );
   }
 }
@@ -292,5 +301,34 @@ class BillingProvider with ChangeNotifier {
       debugPrint('Error searching customers: $e');
     }
     return [];
+  }
+
+  Future<Map<String, dynamic>?> getCustomerLedger(String customerId) async {
+    try {
+      final response = await _apiService.get('/api/customers/$customerId/ledger/');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('Error fetching customer ledger: $e');
+    }
+    return null;
+  }
+
+  Future<bool> recordPayment(String invoiceId, double amount, String mode, String notes) async {
+    try {
+      final response = await _apiService.post(
+        '/api/billing/invoices/$invoiceId/payments/',
+        {
+          'amount': amount,
+          'mode': mode,
+          'notes': notes,
+        },
+      );
+      return response.statusCode == 201;
+    } catch (e) {
+      debugPrint('Error recording payment: $e');
+    }
+    return false;
   }
 }

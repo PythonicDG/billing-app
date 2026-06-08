@@ -1056,16 +1056,40 @@ class _BillingScreenState extends State<BillingScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: TextFormField(
-                            controller: _customerNameController,
-                            style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-                            decoration: const InputDecoration(
-                              labelText: 'Customer Name',
-                              prefixIcon: Icon(Icons.person_outline),
-                              filled: true,
-                              fillColor: Color(0xFFF8FAFC),
-                            ),
-                            validator: (v) => v!.isEmpty ? 'Enter customer name' : null,
+                          child: Autocomplete<Customer>(
+                            optionsBuilder: (TextEditingValue textEditingValue) async {
+                              if (textEditingValue.text.isEmpty) {
+                                return const Iterable<Customer>.empty();
+                              }
+                              return await provider.searchCustomers(textEditingValue.text);
+                            },
+                            displayStringForOption: (Customer option) => option.name,
+                            onSelected: (Customer selection) {
+                              setModalState(() {
+                                _customerNameController.text = selection.name;
+                                _customerPhoneController.text = selection.phone;
+                              });
+                            },
+                            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                              if (controller.text != _customerNameController.text) {
+                                controller.text = _customerNameController.text;
+                              }
+                              controller.addListener(() {
+                                _customerNameController.text = controller.text;
+                              });
+                              return TextFormField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                                decoration: const InputDecoration(
+                                  labelText: 'Customer Name',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                  filled: true,
+                                  fillColor: Color(0xFFF8FAFC),
+                                ),
+                                validator: (v) => v!.isEmpty ? 'Enter customer name' : null,
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1097,6 +1121,26 @@ class _BillingScreenState extends State<BillingScreen> {
                         filled: true,
                         fillColor: Color(0xFFF8FAFC),
                       ),
+                      onChanged: (phone) async {
+                        if (phone.length == 10) {
+                          final results = await provider.searchCustomers(phone);
+                          final exactMatch = results.firstWhere(
+                            (c) => c.phone.trim() == phone.trim(),
+                            orElse: () => Customer(id: '', name: '', phone: ''),
+                          );
+                          if (exactMatch.id.isNotEmpty) {
+                            setModalState(() {
+                              _customerNameController.text = exactMatch.name;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Loaded existing customer: ${exactMatch.name}'),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        }
+                      },
                     ),
                     const SizedBox(height: 20),
 

@@ -701,6 +701,13 @@ class AppDrawer extends StatelessWidget {
               Navigator.pushReplacementNamed(context, '/inventory');
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.account_balance_outlined),
+            title: const Text('Ledgers'),
+            onTap: () {
+              Navigator.pushReplacementNamed(context, '/ledger');
+            },
+          ),
           if (currentRole == 'OWNER')
             ListTile(
               leading: const Icon(Icons.people),

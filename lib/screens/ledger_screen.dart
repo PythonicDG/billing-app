@@ -1,0 +1,925 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../billing_provider.dart';
+import '../auth_provider.dart';
+import 'products_screen.dart'; // To use AppDrawer
+
+class LedgerScreen extends StatefulWidget {
+  const LedgerScreen({super.key});
+
+  @override
+  _LedgerScreenState createState() => _LedgerScreenState();
+}
+
+class _LedgerScreenState extends State<LedgerScreen> {
+  final _searchController = TextEditingController();
+  List<Customer> _customers = [];
+  bool _isLoadingCustomers = false;
+  Customer? _selectedCustomer;
+  Map<String, dynamic>? _selectedLedger;
+  bool _isLoadingLedger = false;
+  Timer? _debounce;
+
+  // Filter and Sorting State
+  String _filterOption = 'ALL'; // 'ALL' or 'OUTSTANDING'
+  String _invoiceFilter = 'ALL'; // 'ALL' or 'UNPAID_PARTIAL'
+  String _invoiceSort = 'NEWEST'; // 'NEWEST', 'OLDEST', 'HIGHEST_OUTSTANDING'
+  
+  // Expanded invoice tracking
+  String? _expandedInvoiceNumber;
+
+  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCustomers();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _fetchCustomers([String query = '']) {
+    setState(() {
+      _isLoadingCustomers = true;
+    });
+    Provider.of<BillingProvider>(context, listen: false)
+        .searchCustomers(query)
+        .then((list) {
+      setState(() {
+        _customers = list;
+        _isLoadingCustomers = false;
+      });
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      _fetchCustomers(query);
+    });
+  }
+
+  void _selectCustomer(Customer customer) {
+    setState(() {
+      _selectedCustomer = customer;
+      _isLoadingLedger = true;
+      _selectedLedger = null;
+      _expandedInvoiceNumber = null;
+    });
+    Provider.of<BillingProvider>(context, listen: false)
+        .getCustomerLedger(customer.id)
+        .then((ledger) {
+      setState(() {
+        _selectedLedger = ledger;
+        _isLoadingLedger = false;
+      });
+    });
+  }
+
+  void _showRecordPaymentDialog(Map<String, dynamic> bill) {
+    final outstanding = double.tryParse(bill['outstanding'].toString()) ?? 0.0;
+    final amountController = TextEditingController(text: outstanding.toStringAsFixed(2));
+    final notesController = TextEditingController();
+    String selectedMode = 'CASH';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            const buttonText = 'RECORD';
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              title: Row(
+                children: [
+                  const Icon(Icons.payment_outlined, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Record Payment - ${bill['invoice_number']}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Outstanding Balance: ${currencyFormat.format(outstanding)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFEF4444), fontSize: 14),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (val) {
+                        setDialogState(() {});
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Payment Amount',
+                        prefixText: '₹ ',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Payment Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569))),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setDialogState(() => selectedMode = 'CASH'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: selectedMode == 'CASH' ? const Color(0xFFEFF6FF) : Colors.white,
+                                border: Border.all(color: selectedMode == 'CASH' ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0)),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.money, color: selectedMode == 'CASH' ? const Color(0xFF2563EB) : const Color(0xFF64748B), size: 18),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'CASH',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: selectedMode == 'CASH' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setDialogState(() => selectedMode = 'UPI'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: selectedMode == 'UPI' ? const Color(0xFFEFF6FF) : Colors.white,
+                                border: Border.all(color: selectedMode == 'UPI' ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0)),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.qr_code, color: selectedMode == 'UPI' ? const Color(0xFF2563EB) : const Color(0xFF64748B), size: 18),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'UPI',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: selectedMode == 'UPI' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: notesController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'Notes (Optional)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B))),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F2C59),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    minimumSize: const Size(120, 40),
+                  ),
+                  onPressed: () {
+                    final amount = double.tryParse(amountController.text) ?? 0.0;
+                    if (amount <= 0 || amount > outstanding) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Invalid payment amount')),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context);
+                    setState(() {
+                      _isLoadingLedger = true;
+                    });
+                    Provider.of<BillingProvider>(context, listen: false)
+                        .recordPayment(bill['id'], amount, selectedMode, notesController.text)
+                        .then((success) {
+                      if (success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Payment recorded successfully')),
+                        );
+                        if (_selectedCustomer != null) {
+                          _selectCustomer(_selectedCustomer!);
+                        }
+                      } else {
+                        setState(() {
+                          _isLoadingLedger = false;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Failed to record payment')),
+                        );
+                      }
+                    });
+                  },
+                  child: Text(buttonText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCustomerList() {
+    // 1. Filter
+    final List<Customer> filteredCustomers = _customers.where((c) {
+      if (_filterOption == 'OUTSTANDING') {
+        return c.outstandingBalance > 0;
+      }
+      return true;
+    }).toList();
+
+    // 2. Sort: outstanding balance first (descending), then settled (alphabetically by name)
+    filteredCustomers.sort((a, b) {
+      if (a.outstandingBalance > 0 && b.outstandingBalance == 0) {
+        return -1;
+      } else if (a.outstandingBalance == 0 && b.outstandingBalance > 0) {
+        return 1;
+      } else if (a.outstandingBalance > 0 && b.outstandingBalance > 0) {
+        return b.outstandingBalance.compareTo(a.outstandingBalance);
+      } else {
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      }
+    });
+
+    return Container(
+      color: Colors.white,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Search customer...',
+                prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFF2563EB)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          
+          // Filter Toggle Row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _filterOption = 'ALL'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _filterOption == 'ALL' ? const Color(0xFF0F2C59) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'All',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _filterOption == 'ALL' ? Colors.white : const Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _filterOption = 'OUTSTANDING'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _filterOption == 'OUTSTANDING' ? const Color(0xFF0F2C59) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Outstanding Only',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _filterOption == 'OUTSTANDING' ? Colors.white : const Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _isLoadingCustomers
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+                : filteredCustomers.isEmpty
+                    ? const Center(child: Text('No customers found', style: TextStyle(color: Color(0xFF64748B))))
+                    : ListView.separated(
+                        itemCount: filteredCustomers.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1, thickness: 0.8),
+                        itemBuilder: (context, index) {
+                          final customer = filteredCustomers[index];
+                          final isSelected = _selectedCustomer?.id == customer.id;
+
+                          bool showSettledHeader = false;
+                          if (index > 0) {
+                            final prev = filteredCustomers[index - 1];
+                            final curr = filteredCustomers[index];
+                            if (prev.outstandingBalance > 0 && curr.outstandingBalance == 0) {
+                              showSettledHeader = true;
+                            }
+                          } else if (index == 0 && filteredCustomers[index].outstandingBalance == 0) {
+                            showSettledHeader = true;
+                          }
+
+                          Widget tile = Container(
+                            decoration: BoxDecoration(
+                              color: isSelected ? const Color(0xFFF8FAFC) : Colors.transparent,
+                              border: Border(
+                                left: BorderSide(
+                                  color: customer.outstandingBalance > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                  width: 4,
+                                ),
+                              ),
+                            ),
+                            child: ListTile(
+                              selected: isSelected,
+                              title: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      customer.name,
+                                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15, color: Color(0xFF0F172A)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (customer.outstandingBalance > 0)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEE2E2),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        currencyFormat.format(customer.outstandingBalance),
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEF4444)),
+                                      ),
+                                    )
+                                  else
+                                    const Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 18),
+                                ],
+                              ),
+                              subtitle: Text(
+                                customer.phone,
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                              leading: CircleAvatar(
+                                backgroundColor: customer.outstandingBalance > 0 
+                                    ? const Color(0xFFFEE2E2) 
+                                    : (isSelected ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9)),
+                                child: Text(
+                                  customer.name.substring(0, 1).toUpperCase(),
+                                  style: TextStyle(
+                                    color: customer.outstandingBalance > 0 
+                                        ? const Color(0xFFEF4444) 
+                                        : (isSelected ? Colors.white : const Color(0xFF475569)),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              onTap: () => _selectCustomer(customer),
+                            ),
+                          );
+
+                          if (showSettledHeader) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 16.0, top: 12.0, bottom: 6.0),
+                                  child: Text(
+                                    'SETTLED CUSTOMERS',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 1.0),
+                                  ),
+                                ),
+                                const Divider(height: 1),
+                                tile,
+                              ],
+                            );
+                          }
+                          return tile;
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLedgerDetail() {
+    if (_selectedCustomer == null) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.receipt_long_outlined, size: 64, color: Color(0xFF94A3B8)),
+            SizedBox(height: 16),
+            Text(
+              'Select a Customer to view outstanding ledger details',
+              style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_isLoadingLedger) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)));
+    }
+
+    if (_selectedLedger == null) {
+      return const Center(child: Text('Failed to load ledger information.', style: TextStyle(color: Color(0xFFEF4444))));
+    }
+
+    final bills = _selectedLedger!['bills'] as List? ?? [];
+    
+    // Compute Summary Stats
+    double totalBilled = 0.0;
+    double totalPaid = 0.0;
+    double calculatedOutstanding = 0.0;
+    for (var bill in bills) {
+      totalBilled += double.tryParse(bill['total'].toString()) ?? 0.0;
+      totalPaid += double.tryParse(bill['paid'].toString()) ?? 0.0;
+      calculatedOutstanding += double.tryParse(bill['outstanding'].toString()) ?? 0.0;
+    }
+
+    // Apply Filter on Invoice
+    final List<dynamic> filteredBills = bills.where((bill) {
+      final outstandingVal = double.tryParse(bill['outstanding'].toString()) ?? 0.0;
+      if (_invoiceFilter == 'UNPAID_PARTIAL') {
+        return outstandingVal > 0;
+      }
+      return true;
+    }).toList();
+
+    // Apply Sorting on Invoice
+    filteredBills.sort((a, b) {
+      if (_invoiceSort == 'NEWEST') {
+        return DateTime.parse(b['date']).compareTo(DateTime.parse(a['date']));
+      } else if (_invoiceSort == 'OLDEST') {
+        return DateTime.parse(a['date']).compareTo(DateTime.parse(b['date']));
+      } else if (_invoiceSort == 'HIGHEST_OUTSTANDING') {
+        final outstandingA = double.tryParse(a['outstanding'].toString()) ?? 0.0;
+        final outstandingB = double.tryParse(b['outstanding'].toString()) ?? 0.0;
+        return outstandingB.compareTo(outstandingA);
+      }
+      return 0;
+    });
+
+    return Container(
+      color: const Color(0xFFF8FAFC),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Customer Name/Phone Panel
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _selectedLedger!['customer_name'] ?? '',
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Phone: ${_selectedLedger!['customer_phone'] ?? ''}',
+                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          
+          // Proper Summary Bar Card
+          Container(
+            margin: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 8),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('TOTAL BILLED', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                      const SizedBox(height: 4),
+                      Text(
+                        currencyFormat.format(totalBilled),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('TOTAL PAID', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                      const SizedBox(height: 4),
+                      Text(
+                        currencyFormat.format(totalPaid),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: calculatedOutstanding > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: calculatedOutstanding > 0 ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'OUTSTANDING',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: calculatedOutstanding > 0 ? const Color(0xFFB91C1C) : const Color(0xFF15803D),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          currencyFormat.format(calculatedOutstanding),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: calculatedOutstanding > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Search, Filter and Sort Row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Filter Dropdown
+                Row(
+                  children: [
+                    const Text('Filter: ', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 4),
+                    DropdownButton<String>(
+                      value: _invoiceFilter,
+                      underline: Container(),
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                      items: const [
+                        DropdownMenuItem(value: 'ALL', child: Text('All Bills')),
+                        DropdownMenuItem(value: 'UNPAID_PARTIAL', child: Text('Unpaid/Partial')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _invoiceFilter = val);
+                      },
+                    ),
+                  ],
+                ),
+                // Sort Dropdown
+                Row(
+                  children: [
+                    const Text('Sort: ', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 4),
+                    DropdownButton<String>(
+                      value: _invoiceSort,
+                      underline: Container(),
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                      items: const [
+                        DropdownMenuItem(value: 'NEWEST', child: Text('Newest First')),
+                        DropdownMenuItem(value: 'OLDEST', child: Text('Oldest First')),
+                        DropdownMenuItem(value: 'HIGHEST_OUTSTANDING', child: Text('Highest Outstanding')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _invoiceSort = val);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Custom Expandable Table-like Rows
+          Expanded(
+            child: filteredBills.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.receipt_long_outlined, size: 64, color: Color(0xFF94A3B8)),
+                        SizedBox(height: 16),
+                        Text(
+                          'No invoices found for this customer',
+                          style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  )
+                : Column(
+                    children: [
+                      // Header
+                      Container(
+                        color: const Color(0xFFF1F5F9),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: const [
+                            Expanded(flex: 3, child: Text('DATE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            Expanded(flex: 3, child: Text('BILL NUMBER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            Expanded(flex: 3, child: Text('TOTAL AMOUNT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            Expanded(flex: 3, child: Text('PAID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            Expanded(flex: 3, child: Text('OUTSTANDING', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                          ],
+                        ),
+                      ),
+                      
+                      // Rows List
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: filteredBills.length,
+                          itemBuilder: (context, index) {
+                            final bill = filteredBills[index];
+                            final isExpanded = _expandedInvoiceNumber == bill['invoice_number'];
+                            final dateStr = DateFormat('dd MMM yyyy').format(DateTime.parse(bill['date']));
+                            final total = double.tryParse(bill['total'].toString()) ?? 0.0;
+                            final paid = double.tryParse(bill['paid'].toString()) ?? 0.0;
+                            final outstanding = double.tryParse(bill['outstanding'].toString()) ?? 0.0;
+                            
+                            // Status Badge
+                            String statusLabel = 'PAID';
+                            Color badgeBg = const Color(0xFFDCFCE7);
+                            Color badgeText = const Color(0xFF16A34A);
+                            if (outstanding > 0) {
+                              if (paid > 0) {
+                                statusLabel = 'PARTIAL';
+                                badgeBg = const Color(0xFFFFEDD5);
+                                badgeText = const Color(0xFFF97316);
+                              } else {
+                                statusLabel = 'UNPAID';
+                                badgeBg = const Color(0xFFFEE2E2);
+                                badgeText = const Color(0xFFEF4444);
+                              }
+                            }
+
+                            final payments = bill['payments'] as List? ?? [];
+                            final isAlternate = index % 2 != 0;
+
+                            return Container(
+                              color: isAlternate ? const Color(0xFFF8FAFC) : Colors.white,
+                              child: Column(
+                                children: [
+                                  // Clickable Header Row
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _expandedInvoiceNumber = isExpanded ? null : bill['invoice_number'];
+                                      });
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                      child: Row(
+                                        children: [
+                                          Expanded(flex: 3, child: Text(dateStr, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
+                                          Expanded(flex: 3, child: Text(bill['invoice_number'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)))),
+                                          Expanded(flex: 3, child: Text(currencyFormat.format(total), style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
+                                          Expanded(flex: 3, child: Text(currencyFormat.format(paid), style: const TextStyle(fontSize: 13, color: Color(0xFF16A34A)))),
+                                          Expanded(
+                                            flex: 3,
+                                            child: Text(
+                                              currencyFormat.format(outstanding),
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                color: outstanding > 0 ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Container(
+                                                width: 80,
+                                                height: 24,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: badgeBg,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  statusLabel,
+                                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeText),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  // Inline Expanded Payment History & Action Panel
+                                  if (isExpanded)
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      color: const Color(0xFFF1F5F9).withOpacity(0.5),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              const Text(
+                                                'PAYMENT HISTORY',
+                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                                              ),
+                                              if (outstanding > 0)
+                                                ElevatedButton.icon(
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: const Color(0xFF0F2C59),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                  ),
+                                                  onPressed: () => _showRecordPaymentDialog(bill),
+                                                  icon: const Icon(Icons.add, size: 14, color: Colors.white),
+                                                  label: const Text(
+                                                    'Add Payment',
+                                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          if (payments.isEmpty)
+                                            const Padding(
+                                              padding: EdgeInsets.symmetric(vertical: 8.0),
+                                              child: Text('No payments recorded for this invoice.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                            )
+                                          else
+                                            Table(
+                                              border: TableBorder.all(color: const Color(0xFFE2E8F0), width: 1, borderRadius: BorderRadius.circular(6)),
+                                              columnWidths: const {
+                                                0: FlexColumnWidth(3),
+                                                1: FlexColumnWidth(3),
+                                                2: FlexColumnWidth(2),
+                                                3: FlexColumnWidth(4),
+                                              },
+                                              children: [
+                                                TableRow(
+                                                  decoration: const BoxDecoration(color: Color(0xFFE2E8F0)),
+                                                  children: const [
+                                                    Padding(padding: EdgeInsets.all(8.0), child: Text('DATE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                                    Padding(padding: EdgeInsets.all(8.0), child: Text('AMOUNT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                                    Padding(padding: EdgeInsets.all(8.0), child: Text('MODE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                                    Padding(padding: EdgeInsets.all(8.0), child: Text('NOTES', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                                  ],
+                                                ),
+                                                ...payments.map((p) {
+                                                  final pDateStr = DateFormat('dd MMM yyyy HH:mm').format(DateTime.parse(p['payment_date']));
+                                                  final pAmt = double.tryParse(p['amount'].toString()) ?? 0.0;
+                                                  return TableRow(
+                                                    children: [
+                                                      Padding(padding: const EdgeInsets.all(8.0), child: Text(pDateStr, style: const TextStyle(fontSize: 11))),
+                                                      Padding(padding: const EdgeInsets.all(8.0), child: Text(currencyFormat.format(pAmt), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)))),
+                                                      Padding(padding: const EdgeInsets.all(8.0), child: Text(p['mode'].toString(), style: const TextStyle(fontSize: 11))),
+                                                      Padding(padding: const EdgeInsets.all(8.0), child: Text(p['notes'].toString(), style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
+                                                    ],
+                                                  );
+                                                }).toList()
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  const Divider(height: 1),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final isWide = MediaQuery.of(context).size.width >= 800;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Row(
+          children: [
+            Icon(Icons.account_balance_outlined, color: Color(0xFF2563EB)),
+            SizedBox(width: 8),
+            Text('Outstanding Ledgers', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A))),
+          ],
+        ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
+      drawer: AppDrawer(currentRole: authProvider.role ?? 'VIEWER'),
+      body: isWide
+          ? Row(
+              children: [
+                SizedBox(
+                  width: 320,
+                  child: _buildCustomerList(),
+                ),
+                const VerticalDivider(width: 1, color: Color(0xFFE2E8F0)),
+                Expanded(
+                  child: _buildLedgerDetail(),
+                ),
+              ],
+            )
+          : _selectedCustomer == null
+              ? _buildCustomerList()
+              : WillPopScope(
+                  onWillPop: () async {
+                    setState(() {
+                      _selectedCustomer = null;
+                      _selectedLedger = null;
+                    });
+                    return false;
+                  },
+                  child: _buildLedgerDetail(),
+                ),
+    );
+  }
+}

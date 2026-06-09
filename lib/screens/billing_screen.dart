@@ -1308,7 +1308,7 @@ class _BillingScreenState extends State<BillingScreen> {
                                     final preview = await provider.previewInvoice(
                                       customerName: _customerNameController.text,
                                       customerPhone: _customerPhoneController.text,
-                                      paidAmount: double.tryParse(_paidAmountController.text) ?? provider.grandTotal,
+                                      paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? provider.grandTotal) : provider.grandTotal,
                                       paymentMethod: _paymentMethod,
                                     );
                                     if (preview != null) {
@@ -1338,7 +1338,7 @@ class _BillingScreenState extends State<BillingScreen> {
                                     final invoiceId = await provider.createInvoice(
                                       customerName: _customerNameController.text,
                                       customerPhone: _customerPhoneController.text,
-                                      paidAmount: double.tryParse(_paidAmountController.text) ?? provider.grandTotal,
+                                      paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? provider.grandTotal) : provider.grandTotal,
                                       paymentMethod: _paymentMethod,
                                     );
                                     if (invoiceId != null) {

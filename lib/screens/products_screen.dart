@@ -180,44 +180,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
           ),
           
-          if (isOwner)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      onPressed: () => _showProductForm(context),
-                      icon: const Icon(Icons.add_circle_outline, size: 20),
-                      label: const Text('ADD PRODUCT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF2563EB),
-                        side: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      onPressed: () => _showBulkUploadDialog(context, productProvider),
-                      icon: const Icon(Icons.cloud_upload_outlined, size: 20),
-                      label: const Text('BULK UPLOAD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
+
           // Inventory Header Summary
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),

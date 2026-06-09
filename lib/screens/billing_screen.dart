@@ -143,7 +143,7 @@ class _BillingScreenState extends State<BillingScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_outlined),
             tooltip: 'Refresh Inventory',
-            onPressed: () => productProvider.fetchProducts(),
+            onPressed: () => productProvider.fetchProducts(pageSize: 100),
           ),
           if (!isWidePOSLayout)
             _buildCartBadgeButton(billingProvider),
@@ -1343,8 +1343,9 @@ class _BillingScreenState extends State<BillingScreen> {
                                     );
                                     if (invoiceId != null) {
                                       Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).clearSnackBars();
                                       final productProvider = Provider.of<ProductProvider>(context, listen: false);
-                                      productProvider.fetchProducts();
+                                      productProvider.fetchProducts(pageSize: 100);
                                       _showSuccessWithDownload(context, provider, invoiceId);
                                     } else {
                                       ScaffoldMessenger.of(context).showSnackBar(

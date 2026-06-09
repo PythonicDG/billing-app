@@ -19,6 +19,7 @@ class _ProductFormState extends State<ProductForm> {
   late TextEditingController _purchasePriceController;
   late TextEditingController _noOfCaseController;
   late TextEditingController _centInPerCsController;
+  late TextEditingController _minStockLevelController;
   double _totalStockInCent = 0.0;
 
   @override
@@ -30,6 +31,7 @@ class _ProductFormState extends State<ProductForm> {
     _purchasePriceController = TextEditingController(text: widget.product?.purchasePrice.toString() ?? '');
     _noOfCaseController = TextEditingController(text: widget.product?.noOfCase.toString() ?? '');
     _centInPerCsController = TextEditingController(text: widget.product?.centInPerCs.toString() ?? '');
+    _minStockLevelController = TextEditingController(text: widget.product?.minStockLevel.toString() ?? '5');
 
     _noOfCaseController.addListener(_updateTotalStock);
     _centInPerCsController.addListener(_updateTotalStock);
@@ -52,6 +54,7 @@ class _ProductFormState extends State<ProductForm> {
     _purchasePriceController.dispose();
     _noOfCaseController.dispose();
     _centInPerCsController.dispose();
+    _minStockLevelController.dispose();
     super.dispose();
   }
 
@@ -64,6 +67,7 @@ class _ProductFormState extends State<ProductForm> {
         'selling_price': double.parse(_sellingPriceController.text),
         'no_of_case': int.parse(_noOfCaseController.text),
         'cent_in_per_cs': int.parse(_centInPerCsController.text),
+        'min_stock_level': int.tryParse(_minStockLevelController.text) ?? 5,
       };
 
       final provider = Provider.of<ProductProvider>(context, listen: false);
@@ -125,6 +129,7 @@ class _ProductFormState extends State<ProductForm> {
                   Expanded(child: _buildTextField(_centInPerCsController, 'Cent in per cs', isNum: true)),
                 ],
               ),
+              _buildTextField(_minStockLevelController, 'Min Stock Level (cent) — Alert threshold', isNum: true, isRequired: false),
               
               // Dynamic Display of calculated Total stock in cent
               Padding(
@@ -177,7 +182,7 @@ class _ProductFormState extends State<ProductForm> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool isNum = false}) {
+  Widget _buildTextField(TextEditingController controller, String label, {bool isNum = false, bool isRequired = true}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
@@ -188,7 +193,7 @@ class _ProductFormState extends State<ProductForm> {
           labelText: label,
           hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
         ),
-        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+        validator: isRequired ? (v) => v == null || v.isEmpty ? 'Required' : null : null,
       ),
     );
   }

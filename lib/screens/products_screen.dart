@@ -19,16 +19,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
   String _activeOrdering = 'created_at';
   Timer? _debounce;
 
-  // Pagination State
-  int _currentPage = 1;
-  static const int _itemsPerPage = 12;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final productProvider = Provider.of<ProductProvider>(context, listen: false);
-      productProvider.fetchProducts(pageSize: 100);
+      productProvider.fetchProducts(pageSize: 12);
       productProvider.fetchCategories();
     });
   }
@@ -71,10 +67,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             icon: const Icon(Icons.refresh_outlined),
             tooltip: 'Refresh',
             onPressed: () {
-              productProvider.fetchProducts(pageSize: 100);
-              setState(() {
-                _currentPage = 1;
-              });
+              Provider.of<ProductProvider>(context, listen: false).fetchProducts(pageSize: 12);
             },
           ),
           if (isOwner) ...[
@@ -138,9 +131,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           onPressed: () {
                             _searchController.clear();
                             productProvider.setSearch('');
-                            setState(() {
-                              _currentPage = 1;
-                            });
                           },
                         )
                       : null,
@@ -161,9 +151,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   ),
                 ),
                 onChanged: (value) {
-                  setState(() {
-                    _currentPage = 1;
-                  });
                   if (_debounce?.isActive ?? false) _debounce!.cancel();
                   _debounce = Timer(const Duration(milliseconds: 250), () {
                     productProvider.setSearch(value);
@@ -172,9 +159,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 onSubmitted: (value) {
                   if (_debounce?.isActive ?? false) _debounce!.cancel();
                   productProvider.setSearch(value);
-                  setState(() {
-                    _currentPage = 1;
-                  });
                 },
               ),
             ),
@@ -246,32 +230,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         ),
                       )
                     : (() {
-                        final displayedProducts = productProvider.products;
-                        final totalItems = displayedProducts.length;
-                        final totalPages = (totalItems / _itemsPerPage).ceil();
-
-                        if (_currentPage > totalPages && totalPages > 0) {
-                          _currentPage = totalPages;
-                        } else if (_currentPage < 1) {
-                          _currentPage = 1;
-                        }
-
-                        final startIndex = (_currentPage - 1) * _itemsPerPage;
-                        final endIndex = startIndex + _itemsPerPage;
-                        final paginatedProducts = totalItems == 0
-                            ? <Product>[]
-                            : displayedProducts.sublist(
-                                startIndex,
-                                endIndex > totalItems ? totalItems : endIndex,
-                              );
+                        final provider = productProvider;
+                        final paginatedProducts = provider.products;
 
                         return LayoutBuilder(
                           builder: (context, constraints) {
-                            final double estimatedContentWidth = isOwner ? 760 : 560;
+                            final double estimatedContentWidth = isOwner ? 900 : 700;
                             final double availableSpacingWidth = constraints.maxWidth - estimatedContentWidth;
                             final double columnSpacing = availableSpacingWidth > 0 
-                                ? (availableSpacingWidth / (isOwner ? 8 : 6)).clamp(16.0, 120.0) 
-                                : 16.0;
+                                ? (availableSpacingWidth / (isOwner ? 9 : 7)).clamp(12.0, 80.0) 
+                                : 12.0;
 
                             return Column(
                               children: [
@@ -299,11 +267,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                              const DataColumn(label: Text('NO. OF CASE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
                                              const DataColumn(label: Text('CENT IN PER CS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
                                              const DataColumn(label: Text('TOTAL STOCK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
+                                             const DataColumn(label: Text('STOCK STATUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
                                              if (isOwner)
                                                const DataColumn(label: Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569)))),
                                            ],
                                            rows: paginatedProducts.map((product) {
                                              final isOutOfStock = product.totalStockInCent <= 0;
+                                             final isLowStock = product.totalStockInCent > 0 && product.totalStockInCent <= product.minStockLevel;
                                              return DataRow(
                                                cells: [
                                                  DataCell(Text(product.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5))),
@@ -331,7 +301,37 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                      style: TextStyle(
                                                        fontWeight: FontWeight.bold,
                                                        fontSize: 12,
-                                                       color: isOutOfStock ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
+                                                       color: isOutOfStock
+                                                           ? const Color(0xFFEF4444)
+                                                           : isLowStock
+                                                               ? const Color(0xFFF97316)
+                                                               : const Color(0xFF16A34A),
+                                                     ),
+                                                   ),
+                                                 ),
+                                                 // Stock Status Badge
+                                                 DataCell(
+                                                   Container(
+                                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                     decoration: BoxDecoration(
+                                                       color: isOutOfStock
+                                                           ? const Color(0xFFFEF2F2)
+                                                           : isLowStock
+                                                               ? const Color(0xFFFFF7ED)
+                                                               : const Color(0xFFF0FDF4),
+                                                       borderRadius: BorderRadius.circular(6),
+                                                     ),
+                                                     child: Text(
+                                                       isOutOfStock ? 'OUT OF STOCK' : isLowStock ? 'LOW STOCK' : 'IN STOCK',
+                                                       style: TextStyle(
+                                                         fontSize: 10,
+                                                         fontWeight: FontWeight.bold,
+                                                         color: isOutOfStock
+                                                             ? const Color(0xFFEF4444)
+                                                             : isLowStock
+                                                                 ? const Color(0xFFF97316)
+                                                                 : const Color(0xFF16A34A),
+                                                       ),
                                                      ),
                                                    ),
                                                  ),
@@ -369,14 +369,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         );
                       })(),
           ),
-          if (_currentPage > 0 && (_currentPage <= ((productProvider.products.length / _itemsPerPage).ceil() == 0 ? 1 : (productProvider.products.length / _itemsPerPage).ceil())))
-             _buildPagination((productProvider.products.length / _itemsPerPage).ceil()),
+          if (!productProvider.isLoading && productProvider.totalPages > 1)
+            _buildPagination(productProvider.totalPages, productProvider),
         ],
       ),
     );
   }
 
-  Widget _buildPagination(int totalPages) {
+  Widget _buildPagination(int totalPages, ProductProvider provider) {
+    final currentPage = provider.currentPage;
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -388,18 +389,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
         children: [
           // PREVIOUS button
           InkWell(
-            onTap: _currentPage > 1
-                ? () {
-                    setState(() {
-                      _currentPage--;
-                    });
-                  }
+            onTap: currentPage > 1
+                ? () => provider.fetchPage(currentPage - 1)
                 : null,
             borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: _currentPage > 1 ? const Color(0xFFEFF6FF) : Colors.transparent,
+                color: currentPage > 1 ? const Color(0xFFEFF6FF) : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -408,7 +405,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   Icon(
                     Icons.chevron_left_outlined,
                     size: 18,
-                    color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                    color: currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -416,7 +413,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                      color: currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
                     ),
                   ),
                 ],
@@ -424,60 +421,65 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
           ),
 
-          // Numbered page selectors
+          // Page count label + numbered page selectors (max 7 visible)
           Row(
             mainAxisSize: MainAxisSize.min,
-            children: List.generate(totalPages, (index) {
-              final pageNum = index + 1;
-              final isCurrent = pageNum == _currentPage;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _currentPage = pageNum;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isCurrent ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9),
+            children: [
+              Text(
+                'Page $currentPage of $totalPages',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 12),
+              ...(() {
+                // Show at most 5 page numbers around currentPage
+                final pages = <int>[];
+                final start = (currentPage - 2).clamp(1, totalPages);
+                final end = (currentPage + 2).clamp(1, totalPages);
+                for (int i = start; i <= end; i++) pages.add(i);
+                return pages.map((pageNum) {
+                  final isCurrent = pageNum == currentPage;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: InkWell(
+                      onTap: isCurrent ? null : () => provider.fetchPage(pageNum),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isCurrent ? Colors.transparent : const Color(0xFFE2E8F0),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: isCurrent ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isCurrent ? Colors.transparent : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Text(
+                          '$pageNum',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: isCurrent ? Colors.white : const Color(0xFF475569),
+                          ),
+                        ),
                       ),
                     ),
-                    child: Text(
-                      '$pageNum',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: isCurrent ? Colors.white : const Color(0xFF475569),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
+                  );
+                }).toList();
+              })(),
+            ],
           ),
 
           // NEXT button
           InkWell(
-            onTap: _currentPage < totalPages
-                ? () {
-                    setState(() {
-                      _currentPage++;
-                    });
-                  }
+            onTap: currentPage < totalPages
+                ? () => provider.fetchPage(currentPage + 1)
                 : null,
             borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: _currentPage < totalPages ? const Color(0xFFEFF6FF) : Colors.transparent,
+                color: currentPage < totalPages ? const Color(0xFFEFF6FF) : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -488,14 +490,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                      color: currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
                     ),
                   ),
                   const SizedBox(width: 4),
                   Icon(
                     Icons.chevron_right_outlined,
                     size: 18,
-                    color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                    color: currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
                   ),
                 ],
               ),
@@ -505,6 +507,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
     );
   }
+
 
   void _showSortOptions(BuildContext context, ProductProvider provider) {
     showModalBottomSheet(
@@ -537,10 +540,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 icon: Icons.calendar_month_outlined,
                 active: _activeOrdering == 'created_at',
                 onTap: () {
-                  setState(() {
-                    _activeOrdering = 'created_at';
-                    _currentPage = 1;
-                  });
+                  setState(() => _activeOrdering = 'created_at');
                   provider.setOrdering('created_at');
                   Navigator.pop(context);
                 },
@@ -550,10 +550,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 icon: Icons.trending_up_outlined,
                 active: _activeOrdering == 'selling_price',
                 onTap: () {
-                  setState(() {
-                    _activeOrdering = 'selling_price';
-                    _currentPage = 1;
-                  });
+                  setState(() => _activeOrdering = 'selling_price');
                   provider.setOrdering('selling_price');
                   Navigator.pop(context);
                 },
@@ -563,10 +560,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 icon: Icons.trending_down_outlined,
                 active: _activeOrdering == '-selling_price',
                 onTap: () {
-                  setState(() {
-                    _activeOrdering = '-selling_price';
-                    _currentPage = 1;
-                  });
+                  setState(() => _activeOrdering = '-selling_price');
                   provider.setOrdering('-selling_price');
                   Navigator.pop(context);
                 },
@@ -576,10 +570,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 icon: Icons.warehouse_outlined,
                 active: _activeOrdering == 'stock_quantity',
                 onTap: () {
-                  setState(() {
-                    _activeOrdering = 'stock_quantity';
-                    _currentPage = 1;
-                  });
+                  setState(() => _activeOrdering = 'stock_quantity');
                   provider.setOrdering('stock_quantity');
                   Navigator.pop(context);
                 },

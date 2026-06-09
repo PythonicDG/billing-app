@@ -63,9 +63,9 @@ class DashboardProvider with ChangeNotifier {
     }
   }
 
-  void setDashboardRange(String range) {
+  Future<void> setDashboardRange(String range) async {
     _dashboardRange = range;
-    fetchDashboardSummary(range: range);
+    await fetchDashboardSummary(range: range);
   }
 
   Future<void> fetchDashboardSummary({String? range}) async {

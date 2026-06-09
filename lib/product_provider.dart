@@ -85,13 +85,19 @@ class ProductProvider with ChangeNotifier {
   bool _isLoading = false;
   String _searchQuery = '';
   String _ordering = 'created_at';
-  int? _pageSize;
+  int _pageSize = 12;
+
+  int _currentPage = 1;
+  int _totalCount = 0;
 
   List<Product> get products => _products;
   List<Category> get categoriesList => _categoriesList;
   bool get isLoading => _isLoading;
   bool get hasNext => _nextUrl != null;
   bool get hasPrevious => _previousUrl != null;
+  int get currentPage => _currentPage;
+  int get totalCount => _totalCount;
+  int get totalPages => (_totalCount / _pageSize).ceil().clamp(1, 99999);
 
   Future<void> fetchCategories() async {
     try {
@@ -122,13 +128,55 @@ class ProductProvider with ChangeNotifier {
     return false;
   }
 
+  /// Fetch a specific page from the server (server-side pagination).
+  Future<void> fetchPage(int page) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.get(
+        ApiConstants.productsUrl,
+        queryParams: {
+          'search': _searchQuery,
+          'ordering': _ordering,
+          'page': page.toString(),
+          'page_size': _pageSize.toString(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('results')) {
+          final results = data['results'] as List;
+          _products = results.map((p) => Product.fromJson(p)).toList();
+          _nextUrl = data['next']?.toString();
+          _previousUrl = data['previous']?.toString();
+          _totalCount = (data['count'] as num?)?.toInt() ?? 0;
+          _currentPage = page;
+        } else if (data is List) {
+          _products = data.map((p) => Product.fromJson(p)).toList();
+          _nextUrl = null;
+          _previousUrl = null;
+          _totalCount = _products.length;
+          _currentPage = 1;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching products page $page: $e');
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<void> fetchProducts({bool initial = true, String? url, int? pageSize}) async {
     _isLoading = true;
+    if (initial) {
+      _currentPage = 1;
+      _products = [];
+    }
     if (pageSize != null) {
       _pageSize = pageSize;
-    }
-    if (initial) {
-      _products = [];
     }
     notifyListeners();
 
@@ -138,7 +186,8 @@ class ProductProvider with ChangeNotifier {
         queryParams: url == null ? {
           'search': _searchQuery,
           'ordering': _ordering,
-          if (_pageSize != null) 'page_size': _pageSize.toString(),
+          'page': _currentPage.toString(),
+          'page_size': _pageSize.toString(),
         } : null,
       );
 
@@ -147,12 +196,14 @@ class ProductProvider with ChangeNotifier {
         if (data is Map && data.containsKey('results')) {
           final results = data['results'] as List;
           _products = results.map((p) => Product.fromJson(p)).toList();
-          _nextUrl = data['next'];
-          _previousUrl = data['previous'];
+          _nextUrl = data['next']?.toString();
+          _previousUrl = data['previous']?.toString();
+          _totalCount = (data['count'] as num?)?.toInt() ?? 0;
         } else if (data is List) {
           _products = data.map((p) => Product.fromJson(p)).toList();
           _nextUrl = null;
           _previousUrl = null;
+          _totalCount = _products.length;
         }
       }
     } catch (e) {
@@ -168,11 +219,13 @@ class ProductProvider with ChangeNotifier {
 
   void setSearch(String query) {
     _searchQuery = query;
+    _currentPage = 1;
     fetchProducts();
   }
 
   void setOrdering(String ordering) {
     _ordering = ordering;
+    _currentPage = 1;
     fetchProducts();
   }
 

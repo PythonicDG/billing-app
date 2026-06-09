@@ -1159,9 +1159,6 @@ class _BillingScreenState extends State<BillingScreen> {
                           Expanded(child: _paymentSegment('CASH', Icons.money_outlined, _paymentMethod == 'CASH', () {
                             setModalState(() { _paymentMethod = 'CASH'; });
                           })),
-                          Expanded(child: _paymentSegment('CARD', Icons.credit_card_outlined, _paymentMethod == 'CARD', () {
-                            setModalState(() { _paymentMethod = 'CARD'; });
-                          })),
                           Expanded(child: _paymentSegment('UPI', Icons.qr_code_outlined, _paymentMethod == 'UPI', () {
                             setModalState(() { _paymentMethod = 'UPI'; });
                           })),
@@ -1210,33 +1207,6 @@ class _BillingScreenState extends State<BillingScreen> {
                             ),
                           ),
                         ],
-                      ),
-                    ] else if (_paymentMethod == 'CARD') ...[
-                      // Simulated Credit card details
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('CREDIT / DEBIT TRANSACTION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFD97706))),
-                                Icon(Icons.payment, color: Color(0xFF475569), size: 18),
-                              ],
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Please swipe or tap the card on your pos terminal. The bill status will automatically settle once authorized.',
-                              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
                       ),
                     ] else if (_paymentMethod == 'UPI') ...[
                       // Simulated UPI Scan code

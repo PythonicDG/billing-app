@@ -346,7 +346,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                                     Expanded(
                                       flex: 2,
                                       child: Text(
-                                        DateFormat('hh:mm a').format(DateTime.parse(invoice['date'])),
+                                        DateFormat('hh:mm a').format(DateTime.parse(invoice['date']).toLocal()),
                                         style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
                                       ),
                                     ),
@@ -1158,7 +1158,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                                     Expanded(
                                       flex: 2,
                                       child: Text(
-                                        DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(invoice['date'])),
+                                        DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(invoice['date']).toLocal()),
                                         style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
                                       ),
                                     ),
@@ -1382,7 +1382,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                       itemCount: payments.length,
                       itemBuilder: (context, idx) {
                         final payment = payments[idx] as Map<String, dynamic>;
-                        final date = DateTime.tryParse(payment['payment_date'] ?? '');
+                        final date = DateTime.tryParse(payment['payment_date'] ?? '')?.toLocal();
                         final dateStr = date != null ? DateFormat('dd MMM yyyy').format(date) : '';
 
                         return ListTile(

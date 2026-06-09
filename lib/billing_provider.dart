@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'constants.dart';
@@ -288,6 +289,18 @@ class BillingProvider with ChangeNotifier {
     final token = await _apiService.getToken();
     if (token == null) return null;
     return '${ApiConstants.baseUrl}${ApiConstants.invoiceThermalReceiptUrl(invoiceId)}?token=$token';
+  }
+
+  Future<Uint8List?> getInvoicePdfBytes(String invoiceId) async {
+    try {
+      final response = await _apiService.get(ApiConstants.invoiceDownloadPdfUrl(invoiceId));
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+    } catch (e) {
+      debugPrint('Error fetching invoice PDF bytes: $e');
+    }
+    return null;
   }
 
   Future<List<Customer>> searchCustomers(String query) async {

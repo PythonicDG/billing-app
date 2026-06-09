@@ -2,8 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:printing/printing.dart';
 import '../billing_provider.dart';
-import '../auth_provider.dart';
 import '../dashboard_provider.dart';
 import 'products_screen.dart'; // To use AppDrawer
 
@@ -716,6 +717,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             Expanded(flex: 3, child: Text('PAID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
                             Expanded(flex: 3, child: Text('OUTSTANDING', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
                             Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            Expanded(flex: 2, child: Text('PREVIEW', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
                           ],
                         ),
                       ),
@@ -727,7 +729,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           itemBuilder: (context, index) {
                             final bill = filteredBills[index];
                             final isExpanded = _expandedInvoiceNumber == bill['invoice_number'];
-                            final dateStr = DateFormat('dd MMM yyyy').format(DateTime.parse(bill['date']));
+                            final dateStr = DateFormat('dd MMM yyyy').format(DateTime.parse(bill['date']).toLocal());
                             final total = double.tryParse(bill['total'].toString()) ?? 0.0;
                             final paid = double.tryParse(bill['paid'].toString()) ?? 0.0;
                             final outstanding = double.tryParse(bill['outstanding'].toString()) ?? 0.0;
@@ -749,6 +751,36 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             }
 
                             final payments = bill['payments'] as List? ?? [];
+                            final double totalPaid = double.tryParse(bill['paid'].toString()) ?? 0.0;
+                            
+                            // Calculate sum of recorded payments in database
+                            double recordedPaymentsSum = 0.0;
+                            for (var p in payments) {
+                              recordedPaymentsSum += double.tryParse(p['amount']?.toString() ?? '0.0') ?? 0.0;
+                            }
+                            
+                            // Virtualized initial payment
+                            final double initialPaid = totalPaid - recordedPaymentsSum;
+                            
+                            // Create unified payments list
+                            final List<Map<String, dynamic>> unifiedPayments = [];
+                            if (initialPaid > 0.01) {
+                              unifiedPayments.add({
+                                'payment_date': bill['date'],
+                                'amount': initialPaid,
+                                'mode': bill['payment_method']?.toString().toUpperCase() ?? 'CASH',
+                                'notes': 'Paid at invoice creation',
+                              });
+                            }
+                            for (var p in payments) {
+                              unifiedPayments.add({
+                                'payment_date': p['payment_date'],
+                                'amount': double.tryParse(p['amount']?.toString() ?? '0.0') ?? 0.0,
+                                'mode': p['mode']?.toString().toUpperCase() ?? 'CASH',
+                                'notes': p['notes']?.toString() ?? '',
+                              });
+                            }
+
                             final isAlternate = index % 2 != 0;
 
                             return Container(
@@ -800,6 +832,72 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                               ),
                                             ),
                                           ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: GestureDetector(
+                                                onTap: () {}, // Prevents expansion/collapse of the row
+                                                child: PopupMenuButton<String>(
+                                                  icon: const Icon(Icons.visibility_outlined, size: 20, color: Color(0xFF64748B)),
+                                                  tooltip: 'Preview Invoice',
+                                                  onSelected: (value) async {
+                                                    final provider = Provider.of<BillingProvider>(context, listen: false);
+                                                    final invoiceId = bill['id'].toString();
+                                                    if (value == 'view') {
+                                                      if (context.mounted) {
+                                                        _showPdfPreviewDialog(context, invoiceId, bill['invoice_number'].toString());
+                                                      }
+                                                    } else if (value == 'download') {
+                                                      final url = await provider.getInvoicePdfUrl(invoiceId);
+                                                      if (context.mounted) _launchInvoiceUrl(context, url, inApp: false);
+                                                    } else if (value == 'print') {
+                                                      final url = await provider.getInvoicePrintHtmlUrl(invoiceId);
+                                                      if (context.mounted && url != null) {
+                                                        final printUrl = '$url&autoprint=true';
+                                                        _launchInvoiceUrl(context, printUrl, inApp: false);
+                                                      }
+                                                    }
+                                                  },
+                                                  itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                                    const PopupMenuItem<String>(
+                                                      value: 'view',
+                                                      height: 36,
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
+                                                          SizedBox(width: 8),
+                                                          Text('View inside app', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const PopupMenuItem<String>(
+                                                      value: 'download',
+                                                      height: 36,
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF64748B)),
+                                                          SizedBox(width: 8),
+                                                          Text('Download PDF', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const PopupMenuItem<String>(
+                                                      value: 'print',
+                                                      height: 36,
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons.print_outlined, size: 16, color: Color(0xFF64748B)),
+                                                          SizedBox(width: 8),
+                                                          Text('Print', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -837,7 +935,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                             ],
                                           ),
                                           const SizedBox(height: 8),
-                                          if (payments.isEmpty)
+                                          if (unifiedPayments.isEmpty)
                                             const Padding(
                                               padding: EdgeInsets.symmetric(vertical: 8.0),
                                               child: Text('No payments recorded for this invoice.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
@@ -861,8 +959,12 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                     Padding(padding: EdgeInsets.all(8.0), child: Text('NOTES', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
                                                   ],
                                                 ),
-                                                ...payments.map((p) {
-                                                  final pDateStr = DateFormat('dd MMM yyyy HH:mm').format(DateTime.parse(p['payment_date']));
+                                                ...unifiedPayments.map((p) {
+                                                  final paymentDateRaw = p['payment_date'];
+                                                   final paymentDateTime = paymentDateRaw != null
+                                                      ? (DateTime.tryParse(paymentDateRaw.toString())?.toLocal() ?? DateTime.now())
+                                                      : DateTime.now();
+                                                  final pDateStr = DateFormat('dd MMM yyyy HH:mm').format(paymentDateTime);
                                                   final pAmt = double.tryParse(p['amount'].toString()) ?? 0.0;
                                                   return TableRow(
                                                     children: [
@@ -872,7 +974,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                       Padding(padding: const EdgeInsets.all(8.0), child: Text(p['notes'].toString(), style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
                                                     ],
                                                   );
-                                                }).toList()
+                                                })
                                               ],
                                             ),
                                         ],
@@ -935,6 +1037,100 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   },
                   child: _buildLedgerDetail(),
                 ),
+    );
+  }
+
+  Future<void> _launchInvoiceUrl(BuildContext context, String? url, {bool inApp = false}) async {
+    if (url == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error generating link. Please ensure you are logged in.')));
+      }
+      return;
+    }
+    
+    final uri = Uri.parse(url);
+    try {
+      final success = await launchUrl(
+        uri,
+        mode: inApp ? LaunchMode.inAppWebView : LaunchMode.externalApplication,
+      );
+      if (!success) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open browser. Please check settings.')));
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  void _showPdfPreviewDialog(BuildContext context, String invoiceId, String invoiceNumber) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final billingProvider = Provider.of<BillingProvider>(context, listen: false);
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Container(
+            width: 900,
+            height: 700,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444)),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Invoice Preview - $invoiceNumber',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                Expanded(
+                  child: PdfPreview(
+                    build: (format) async {
+                      final bytes = await billingProvider.getInvoicePdfBytes(invoiceId);
+                      if (bytes == null) {
+                        throw Exception('Failed to load PDF');
+                      }
+                      return bytes;
+                    },
+                    allowPrinting: true,
+                    allowSharing: false,
+                    canChangePageFormat: false,
+                    canChangeOrientation: false,
+                    canDebug: false,
+                    loadingWidget: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                    onError: (context, error) {
+                      return Center(
+                        child: Text(
+                          'Error loading PDF: $error',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

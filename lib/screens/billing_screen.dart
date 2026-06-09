@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../billing_provider.dart';
 import '../product_provider.dart';
 import '../auth_provider.dart';
+import '../dashboard_provider.dart';
 import 'products_screen.dart';
 
 class BillingScreen extends StatefulWidget {
@@ -151,7 +152,7 @@ class _BillingScreenState extends State<BillingScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
-      drawer: AppDrawer(currentRole: authProvider.role ?? 'VIEWER'),
+      drawer: const AppDrawer(),
       body: isWidePOSLayout
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1342,6 +1343,8 @@ class _BillingScreenState extends State<BillingScreen> {
                                     );
                                     if (invoiceId != null) {
                                       Navigator.pop(context);
+                                      final productProvider = Provider.of<ProductProvider>(context, listen: false);
+                                      productProvider.fetchProducts();
                                       _showSuccessWithDownload(context, provider, invoiceId);
                                     } else {
                                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1455,7 +1458,8 @@ class _BillingScreenState extends State<BillingScreen> {
                 Text('Date: $dateStr', style: const TextStyle(color: Colors.black, fontSize: 11, fontFamily: 'monospace')),
                 Text('Cust: ${data['customer_name'] ?? 'Walk-In'}', style: const TextStyle(color: Colors.black, fontSize: 11, fontFamily: 'monospace')),
                 if (data['customer_phone'] != null && data['customer_phone']!.isNotEmpty)
-                  Text('Ph  : ${data['customer_phone']}', style: const TextStyle(color: Colors.black, fontSize: 11, fontFamily: 'monospace')),
+                  Text('Ph  : +91 ${data['customer_phone']}', style: const TextStyle(color: Colors.black, fontSize: 11, fontFamily: 'monospace')),
+                Text('Mode: ${data['payment_method']?.toString().toUpperCase() ?? "CASH"}', style: const TextStyle(color: Colors.black, fontSize: 11, fontFamily: 'monospace')),
                 
                 const Text('--------------------------------', style: TextStyle(color: Colors.black45, fontSize: 12, fontFamily: 'monospace')),
                 
@@ -1463,10 +1467,10 @@ class _BillingScreenState extends State<BillingScreen> {
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(child: Text('Item Name', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace'))),
-                    Text('Qty', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-                    SizedBox(width: 8),
-                    Text('Total', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                    Expanded(child: Text('ITEM DESCRIPTION', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace'))),
+                    Text('QTY', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                    SizedBox(width: 16),
+                    Text('AMOUNT', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
                   ],
                 ),
                 const Text('--------------------------------', style: TextStyle(color: Colors.black45, fontSize: 12, fontFamily: 'monospace')),
@@ -1483,26 +1487,26 @@ class _BillingScreenState extends State<BillingScreen> {
                   double totPrice = (double.tryParse(item['quantity']?.toString() ?? '0') ?? 0.0) * (double.tryParse(item['unit_price']?.toString() ?? '0') ?? 0.0);
 
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            "${matchingProduct.name}${matchingProduct.brand.isNotEmpty ? ' (${matchingProduct.brand})' : ''}",
-                            style: const TextStyle(color: Colors.black87, fontSize: 10.5, fontFamily: 'monospace'),
-                            maxLines: 2,
-                          ),
-                        ),
                         Text(
-                          '${item['quantity']}',
-                          style: const TextStyle(color: Colors.black, fontSize: 10.5, fontFamily: 'monospace'),
+                          matchingProduct.name.toUpperCase(),
+                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'monospace'),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '₹${totPrice.toStringAsFixed(0)}',
-                          style: const TextStyle(color: Colors.black, fontSize: 10.5, fontFamily: 'monospace'),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "  ${item['quantity']} ${item['unit']?.toString().toLowerCase() ?? 'piece'} @ ₹${double.parse(item['unit_price']?.toString() ?? '0').toStringAsFixed(2)}",
+                              style: const TextStyle(color: Colors.black87, fontSize: 10, fontFamily: 'monospace'),
+                            ),
+                            Text(
+                              "₹${totPrice.toStringAsFixed(2)}",
+                              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'monospace'),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -1512,27 +1516,47 @@ class _BillingScreenState extends State<BillingScreen> {
                 const Text('--------------------------------', style: TextStyle(color: Colors.black45, fontSize: 12, fontFamily: 'monospace')),
                 
                 // Calculations
-                _receiptRow('Subtotal', '₹${double.parse(data['sub_total']?.toString() ?? '0').toStringAsFixed(2)}'),
+                _receiptRow('SUB-TOTAL', '₹${double.parse(data['sub_total']?.toString() ?? '0').toStringAsFixed(2)}'),
+                if (double.parse(data['tax_amount']?.toString() ?? '0') > 0)
+                  _receiptRow('TAX / GST', '₹${double.parse(data['tax_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
+                if (double.parse(data['discount_amount']?.toString() ?? '0') > 0)
+                  _receiptRow('DISCOUNT', '-₹${double.parse(data['discount_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
                 
                 const Text('--------------------------------', style: TextStyle(color: Colors.black45, fontSize: 12, fontFamily: 'monospace')),
                 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('NET PAYABLE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'monospace')),
+                    const Text('GRAND TOTAL', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'monospace')),
                     Text(
                       '₹${double.parse(data['grand_total']?.toString() ?? '0').toStringAsFixed(2)}',
                       style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'monospace'),
                     ),
                   ],
                 ),
+                const SizedBox(height: 4),
+                _receiptRow('AMOUNT PAID', '₹${double.parse(data['paid_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
                 
-                const SizedBox(height: 20),
+                // Due / Outstanding
+                (() {
+                  double total = double.parse(data['grand_total']?.toString() ?? '0');
+                  double paid = double.parse(data['paid_amount']?.toString() ?? '0');
+                  double due = (total - paid).clamp(0, double.infinity);
+                  return _receiptRow(
+                    'OUTSTANDING DUE', 
+                    '₹${due.toStringAsFixed(2)}',
+                  );
+                })(),
+                
+                const Text('--------------------------------', style: TextStyle(color: Colors.black45, fontSize: 12, fontFamily: 'monospace')),
+                
+                const SizedBox(height: 12),
                 const Center(
                   child: Column(
                     children: [
-                      Text('THANK YOU!', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'monospace')),
-                      Text('Wishing you a Safe & Happy Diwali!', style: TextStyle(color: Colors.black54, fontSize: 9, fontFamily: 'monospace')),
+                      Text('THANK YOU! VISIT AGAIN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'monospace')),
+                      SizedBox(height: 2),
+                      Text('Wishing you a Safe & Happy Celebration!', style: TextStyle(color: Colors.black54, fontSize: 9, fontFamily: 'monospace')),
                     ],
                   ),
                 ),

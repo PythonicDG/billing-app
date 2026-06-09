@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../product_provider.dart';
 import '../auth_provider.dart';
 import '../widgets/product_form.dart';
@@ -41,8 +43,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   @override
   Widget build(BuildContext context) {
     final productProvider = Provider.of<ProductProvider>(context);
-    final authProvider = Provider.of<AuthProvider>(context);
-    final isOwner = authProvider.role?.toUpperCase() == 'OWNER';
+    final isOwner = true;
 
 
 
@@ -76,7 +77,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
               });
             },
           ),
-          if (isOwner)
+          if (isOwner) ...[
+            IconButton(
+              icon: const Icon(Icons.cloud_upload_outlined, color: Color(0xFF2563EB)),
+              tooltip: 'Bulk Upload',
+              onPressed: () {
+                _showBulkUploadDialog(context, productProvider);
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.add_circle_outline, color: Color(0xFF2563EB)),
               tooltip: 'Add Firecracker',
@@ -84,12 +92,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 _showProductForm(context);
               },
             ),
+          ],
           const SizedBox(width: 8),
         ],
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
-      drawer: AppDrawer(currentRole: authProvider.role ?? 'VIEWER'),
+      drawer: const AppDrawer(),
       floatingActionButton: isOwner
           ? Padding(
               padding: const EdgeInsets.only(bottom: 60.0),
@@ -170,6 +179,44 @@ class _ProductsScreenState extends State<ProductsScreen> {
               ),
             ),
           ),
+          
+          if (isOwner)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      onPressed: () => _showProductForm(context),
+                      icon: const Icon(Icons.add_circle_outline, size: 20),
+                      label: const Text('ADD PRODUCT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF2563EB),
+                        side: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      onPressed: () => _showBulkUploadDialog(context, productProvider),
+                      icon: const Icon(Icons.cloud_upload_outlined, size: 20),
+                      label: const Text('BULK UPLOAD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           
           // Inventory Header Summary
           Padding(
@@ -602,6 +649,241 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
+  void _showBulkUploadDialog(BuildContext context, ProductProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isUploading = false;
+        String? uploadError;
+        Map<String, dynamic>? uploadResult;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.cloud_upload_outlined, color: Color(0xFF2563EB)),
+                  SizedBox(width: 8),
+                  Text('Bulk Add Products', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
+              ),
+              content: Container(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Download our template file, fill in your product details, and upload the CSV file here to add or update products in bulk.',
+                      style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Download Section
+                    Row(
+                      children: [
+                        const Icon(Icons.description_outlined, color: Color(0xFF64748B), size: 20),
+                        const SizedBox(width: 8),
+                        const Text('1. Get Excel/CSV Template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEFF6FF),
+                            foregroundColor: const Color(0xFF2563EB),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () async {
+                            final templateText = await provider.downloadTemplate();
+                            if (templateText != null) {
+                              String? savePath = await FilePicker.saveFile(
+                                dialogTitle: 'Save CSV Template',
+                                fileName: 'products_template.csv',
+                                type: FileType.custom,
+                                allowedExtensions: ['csv'],
+                              );
+                              if (savePath != null) {
+                                final file = File(savePath);
+                                await file.writeAsString(templateText);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Template saved successfully!')),
+                                );
+                              }
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Failed to download template.')),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.download_outlined, size: 14),
+                          label: const Text('Download', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 16),
+                    
+                    // Upload Section
+                    Row(
+                      children: [
+                        const Icon(Icons.upload_file_outlined, color: Color(0xFF64748B), size: 20),
+                        const SizedBox(width: 8),
+                        const Text('2. Upload Completed CSV', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: isUploading
+                              ? null
+                              : () async {
+                                  FilePickerResult? result = await FilePicker.pickFiles(
+                                    type: FileType.custom,
+                                    allowedExtensions: ['csv'],
+                                    withData: true,
+                                  );
+
+                                  if (result != null && result.files.isNotEmpty) {
+                                    setDialogState(() {
+                                      isUploading = true;
+                                      uploadError = null;
+                                      uploadResult = null;
+                                    });
+
+                                    final file = result.files.first;
+                                    final fileBytes = file.bytes;
+                                    final fileName = file.name;
+
+                                    if (fileBytes != null) {
+                                      final res = await provider.bulkUploadProducts(fileBytes, fileName);
+                                      setDialogState(() {
+                                        isUploading = false;
+                                        if (res != null && res['success'] == true) {
+                                          uploadResult = res;
+                                        } else {
+                                          uploadError = res?['error'] ?? 'Upload failed';
+                                        }
+                                      });
+                                    } else if (file.path != null) {
+                                      final localBytes = File(file.path!).readAsBytesSync();
+                                      final res = await provider.bulkUploadProducts(localBytes, fileName);
+                                      setDialogState(() {
+                                        isUploading = false;
+                                        if (res != null && res['success'] == true) {
+                                          uploadResult = res;
+                                        } else {
+                                          uploadError = res?['error'] ?? 'Upload failed';
+                                        }
+                                      });
+                                    } else {
+                                      setDialogState(() {
+                                        isUploading = false;
+                                        uploadError = 'Could not read file data.';
+                                      });
+                                    }
+                                  }
+                                },
+                          icon: isUploading
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.file_upload_outlined, size: 14),
+                          label: Text(
+                            isUploading ? 'Uploading...' : 'Select File',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        )
+                      ],
+                    ),
+                    
+                    if (isUploading) ...[
+                      const SizedBox(height: 20),
+                      const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))),
+                    ],
+
+                    if (uploadError != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Text(
+                          uploadError!,
+                          style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12.5),
+                        ),
+                      )
+                    ],
+
+                    if (uploadResult != null) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.check_circle_outline, color: Color(0xFF16A34A), size: 18),
+                                SizedBox(width: 6),
+                                Text('Upload Completed Successfully', style: TextStyle(color: Color(0xFF15803D), fontWeight: FontWeight.bold, fontSize: 13)),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text('Created: ${uploadResult!['created_count']} products', style: const TextStyle(fontSize: 12)),
+                            Text('Updated: ${uploadResult!['updated_count']} products', style: const TextStyle(fontSize: 12)),
+                            if (uploadResult!['errors'] != null && (uploadResult!['errors'] as List).isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              const Text('Errors / Warnings:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFD97706))),
+                              const SizedBox(height: 4),
+                              Container(
+                                constraints: const BoxConstraints(maxHeight: 100),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: (uploadResult!['errors'] as List).length,
+                                  itemBuilder: (context, index) {
+                                    return Text(
+                                      '- ${(uploadResult!['errors'] as List)[index]}',
+                                      style: const TextStyle(color: Color(0xFFB45309), fontSize: 11),
+                                    );
+                                  },
+                                ),
+                              )
+                            ]
+                          ],
+                        ),
+                      )
+                    ]
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showProductForm(BuildContext context, {Product? product}) {
     showModalBottomSheet(
       context: context,
@@ -666,8 +948,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 }
 
 class AppDrawer extends StatelessWidget {
-  final String currentRole;
-  const AppDrawer({super.key, required this.currentRole});
+  const AppDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -675,17 +956,24 @@ class AppDrawer extends StatelessWidget {
       backgroundColor: Colors.white,
       child: ListView(
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(color: Color(0xFF2563EB)),
+          const DrawerHeader(
+            decoration: BoxDecoration(color: Color(0xFF2563EB)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.local_fire_department_outlined, size: 48, color: Colors.white),
-                const SizedBox(height: 16),
-                const Text('Vighnaharta Fataka', style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
-                Text(currentRole, style: const TextStyle(color: Colors.white70)),
+                Icon(Icons.local_fire_department_outlined, size: 48, color: Colors.white),
+                SizedBox(height: 16),
+                Text('Vighnaharta Fataka', style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+                Text('Manager Dashboard', style: TextStyle(color: Colors.white70)),
               ],
             ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.dashboard_outlined),
+            title: const Text('Dashboard'),
+            onTap: () {
+              Navigator.pushReplacementNamed(context, '/dashboard');
+            },
           ),
           ListTile(
             leading: const Icon(Icons.receipt_long),
@@ -708,14 +996,13 @@ class AppDrawer extends StatelessWidget {
               Navigator.pushReplacementNamed(context, '/ledger');
             },
           ),
-          if (currentRole == 'OWNER')
-            ListTile(
-              leading: const Icon(Icons.people),
-              title: const Text('Staff Management'),
-              onTap: () {
-                Navigator.pushReplacementNamed(context, '/staff');
-              },
-            ),
+          ListTile(
+            leading: const Icon(Icons.bar_chart_outlined),
+            title: const Text('Reports'),
+            onTap: () {
+              Navigator.pushReplacementNamed(context, '/reports');
+            },
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),

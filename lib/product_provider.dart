@@ -216,4 +216,39 @@ class ProductProvider with ChangeNotifier {
     }
     return false;
   }
+
+  Future<String?> downloadTemplate() async {
+    try {
+      final response = await _apiService.get('/api/products/download_template/');
+      if (response.statusCode == 200) {
+        return response.body;
+      }
+    } catch (e) {
+      debugPrint('Error downloading template: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> bulkUploadProducts(Uint8List fileBytes, String fileName) async {
+    try {
+      final response = await _apiService.multipartRequest(
+        method: 'POST',
+        endpoint: '/api/products/bulk_upload/',
+        fields: {},
+        fileBytes: fileBytes,
+        fileName: fileName,
+        fileField: 'file',
+      );
+      if (response.statusCode == 200 || response.statusCode == 207) {
+        fetchProducts();
+        return jsonDecode(response.body);
+      } else {
+        final data = jsonDecode(response.body);
+        return {'success': false, 'error': data['error'] ?? 'Upload failed'};
+      }
+    } catch (e) {
+      debugPrint('Error in bulk upload: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
 }

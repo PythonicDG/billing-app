@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../billing_provider.dart';
 import '../auth_provider.dart';
+import '../dashboard_provider.dart';
 import 'products_screen.dart'; // To use AppDrawer
 
 class LedgerScreen extends StatefulWidget {
@@ -32,10 +33,24 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
 
+  bool _initialized = false;
+
   @override
   void initState() {
     super.initState();
     _fetchCustomers();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Customer) {
+        _selectCustomer(args);
+      }
+      _initialized = true;
+    }
   }
 
   @override
@@ -231,6 +246,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         .recordPayment(bill['id'], amount, selectedMode, notesController.text)
                         .then((success) {
                       if (success) {
+                        Provider.of<DashboardProvider>(context, listen: false).refreshAll();
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Payment recorded successfully')),
                         );
@@ -879,7 +895,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
     final isWide = MediaQuery.of(context).size.width >= 800;
 
     return Scaffold(
@@ -894,7 +909,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
-      drawer: AppDrawer(currentRole: authProvider.role ?? 'VIEWER'),
+      drawer: const AppDrawer(),
       body: isWide
           ? Row(
               children: [

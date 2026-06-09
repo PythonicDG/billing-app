@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String baseUrl = 'http://127.0.0.1:8000'; // Local Host URL
+  static const String baseUrl = 'https://api.vighnahartafataka.chickenkiller.com'; // Production URL
   static const String loginUrl = '/api/login/';
   static const String productsUrl = '/api/products/';
   static const String staffListUrl = '/api/staff/list/';
@@ -7,6 +7,13 @@ class ApiConstants {
   static const String invoicesUrl = '/api/billing/invoices/';
   static const String invoicePreviewUrl = '/api/billing/invoices/preview/';
   static const String customersUrl = '/api/customers/';
+
+  // Dashboard & Reports
+  static const String dashboardSummaryUrl = '/api/dashboard/summary/';
+  static const String dailySalesUrl = '/api/reports/daily-sales/';
+  static const String outstandingReportUrl = '/api/reports/outstanding/';
+  static const String stockSummaryUrl = '/api/reports/stock-summary/';
+  static const String customerSalesUrl = '/api/reports/customer-sales/';
 
   static String invoiceDetailUrl(String id) => '/api/billing/invoices/$id/';
   static String invoiceDownloadPdfUrl(String id) => '/api/billing/invoices/$id/download_pdf/';

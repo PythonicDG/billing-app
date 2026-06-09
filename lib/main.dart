@@ -4,15 +4,15 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'auth_provider.dart';
 import 'product_provider.dart';
-import 'staff_provider.dart';
 import 'billing_provider.dart';
+import 'dashboard_provider.dart';
 import 'theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/products_screen.dart';
-import 'screens/staff_screen.dart';
 import 'screens/billing_screen.dart';
 import 'screens/ledger_screen.dart';
+import 'screens/reports_screen.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -29,8 +29,8 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ProductProvider()),
-        ChangeNotifierProvider(create: (_) => StaffProvider()),
         ChangeNotifierProvider(create: (_) => BillingProvider()),
+        ChangeNotifierProvider(create: (_) => DashboardProvider()),
       ],
       child: const VighnahartaApp(),
     ),
@@ -54,9 +54,9 @@ class VighnahartaApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/dashboard': (context) => const DashboardScreen(),
         '/inventory': (context) => const ProductsScreen(),
-        '/staff': (context) => const StaffScreen(),
         '/billing': (context) => const BillingScreen(),
         '/ledger': (context) => const LedgerScreen(),
+        '/reports': (context) => const ReportsScreen(),
       },
     );
   }

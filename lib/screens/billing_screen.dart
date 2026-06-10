@@ -413,120 +413,268 @@ class _BillingScreenState extends State<BillingScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // PREVIOUS button
-                InkWell(
-                  onTap: _currentPage > 1
-                      ? () {
-                          setState(() {
-                            _currentPage--;
-                          });
-                        }
-                      : null,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _currentPage > 1 ? const Color(0xFFEFF6FF) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.chevron_left_outlined,
-                          size: 18,
-                          color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'PREV',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Numbered page selectors
+                // Left buttons: FIRST & PREV
                 Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: List.generate(totalPages, (index) {
-                    final pageNum = index + 1;
-                    final isCurrent = pageNum == _currentPage;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: InkWell(
-                        onTap: () {
-                          setState(() {
-                            _currentPage = pageNum;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: isCurrent ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isCurrent ? Colors.transparent : const Color(0xFFE2E8F0),
+                  children: [
+                    // FIRST button
+                    InkWell(
+                      onTap: _currentPage > 1
+                          ? () {
+                              setState(() {
+                                _currentPage = 1;
+                              });
+                            }
+                          : null,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _currentPage > 1 ? const Color(0xFFEFF6FF) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.first_page_outlined,
+                              size: 18,
+                              color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
                             ),
-                          ),
-                          child: Text(
-                            '$pageNum',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.bold,
-                              color: isCurrent ? Colors.white : const Color(0xFF475569),
+                            const SizedBox(width: 4),
+                            Text(
+                              'FIRST',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                    );
-                  }),
+                    ),
+                    const SizedBox(width: 8),
+                    // PREVIOUS button
+                    InkWell(
+                      onTap: _currentPage > 1
+                          ? () {
+                              setState(() {
+                                _currentPage--;
+                              });
+                            }
+                          : null,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _currentPage > 1 ? const Color(0xFFEFF6FF) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.chevron_left_outlined,
+                              size: 18,
+                              color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'PREV',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: _currentPage > 1 ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
-                // NEXT button
-                InkWell(
-                  onTap: _currentPage < totalPages
-                      ? () {
-                          setState(() {
-                            _currentPage++;
-                          });
+                // Center page count label + numbered page selectors
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Page $_currentPage of $totalPages',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(width: 12),
+                    ...(() {
+                      final List<dynamic> items = [];
+                      if (totalPages <= 1) return <Widget>[];
+
+                      // Page 1 always
+                      items.add(1);
+
+                      int start = _currentPage - 2;
+                      int end = _currentPage + 2;
+
+                      if (start <= 2) {
+                        start = 2;
+                      }
+                      if (end >= totalPages - 1) {
+                        end = totalPages - 1;
+                      }
+
+                      if (start > 2) {
+                        items.add('...');
+                      }
+
+                      for (int i = start; i <= end; i++) {
+                        if (i > 1 && i < totalPages) {
+                          items.add(i);
                         }
-                      : null,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _currentPage < totalPages ? const Color(0xFFEFF6FF) : Colors.transparent,
+                      }
+
+                      if (end < totalPages - 1) {
+                        items.add('...');
+                      }
+
+                      // Last page always
+                      items.add(totalPages);
+
+                      return items.map((item) {
+                        if (item is String) {
+                          return Container(
+                            width: 32,
+                            height: 32,
+                            alignment: Alignment.center,
+                            child: const Text(
+                              '...',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          );
+                        } else {
+                          final pageNum = item as int;
+                          final isCurrent = pageNum == _currentPage;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: InkWell(
+                              onTap: isCurrent
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _currentPage = pageNum;
+                                      });
+                                    },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: isCurrent ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isCurrent ? Colors.transparent : const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                child: Text(
+                                  '$pageNum',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isCurrent ? Colors.white : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                      }).toList();
+                    })(),
+                  ],
+                ),
+
+                // Right buttons: NEXT & LAST
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // NEXT button
+                    InkWell(
+                      onTap: _currentPage < totalPages
+                          ? () {
+                              setState(() {
+                                _currentPage++;
+                              });
+                            }
+                          : null,
                       borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'NEXT',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
-                          ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _currentPage < totalPages ? const Color(0xFFEFF6FF) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.chevron_right_outlined,
-                          size: 18,
-                          color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'NEXT',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.chevron_right_outlined,
+                              size: 18,
+                              color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    // LAST button
+                    InkWell(
+                      onTap: _currentPage < totalPages
+                          ? () {
+                              setState(() {
+                                _currentPage = totalPages;
+                              });
+                            }
+                          : null,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _currentPage < totalPages ? const Color(0xFFEFF6FF) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'LAST',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.last_page_outlined,
+                              size: 18,
+                              color: _currentPage < totalPages ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

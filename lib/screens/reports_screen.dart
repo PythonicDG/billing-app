@@ -13,9 +13,12 @@ class ReportsScreen extends StatefulWidget {
   _ReportsScreenState createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
+class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tabController;
   final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+
+  @override
+  bool get wantKeepAlive => true;
 
   // Daily Sales Tab State
   DateTime _dailySalesDate = DateTime.now();
@@ -61,13 +64,21 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   void _handleTabSelection() {
     if (_tabController.indexIsChanging) return;
 
+    final dashProvider = Provider.of<DashboardProvider>(context, listen: false);
+
     // Load data when shifting to a tab if not loaded yet
     if (_tabController.index == 0) {
-      _loadDailySales();
+      if (dashProvider.dailySalesData == null && !dashProvider.isDailySalesLoading) {
+        _loadDailySales();
+      }
     } else if (_tabController.index == 1) {
-      _loadOutstandingCustomers();
+      if (dashProvider.outstandingData == null && !dashProvider.isOutstandingLoading) {
+        _loadOutstandingCustomers();
+      }
     } else if (_tabController.index == 2) {
-      _loadStockSummary();
+      if (dashProvider.stockData == null && !dashProvider.isStockLoading) {
+        _loadStockSummary();
+      }
     }
   }
 
@@ -101,7 +112,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -220,7 +231,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               child: LinearProgressIndicator(color: Color(0xFF2563EB), minHeight: 2),
             ),
 
-          if (dashProvider.isDailySalesLoading && data == null)
+          if (dashProvider.isDailySalesLoading && (data == null || (data['invoices'] as List).isEmpty))
             const Expanded(
               child: Center(
                 child: CircularProgressIndicator(color: Color(0xFF2563EB)),
@@ -430,7 +441,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               padding: EdgeInsets.only(bottom: 8.0),
               child: LinearProgressIndicator(color: Color(0xFF2563EB), minHeight: 2),
             ),
-          if (dashProvider.isOutstandingLoading && data == null)
+          if (dashProvider.isOutstandingLoading && (data == null || (data['customers'] as List).isEmpty))
             const Expanded(
               child: Center(
                 child: CircularProgressIndicator(color: Color(0xFF2563EB)),
@@ -647,7 +658,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               padding: EdgeInsets.only(bottom: 8.0),
               child: LinearProgressIndicator(color: Color(0xFF2563EB), minHeight: 2),
             ),
-          if (dashProvider.isStockLoading && data == null)
+          if (dashProvider.isStockLoading && (data == null || (data['products'] as List).isEmpty))
             const Expanded(
               child: Center(
                 child: CircularProgressIndicator(color: Color(0xFF2563EB)),
@@ -1017,7 +1028,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               child: LinearProgressIndicator(color: Color(0xFF2563EB), minHeight: 2),
             ),
 
-          if (dashProvider.isCustomerSalesLoading && data == null)
+          if (dashProvider.isCustomerSalesLoading && (data == null || (data['invoices'] as List).isEmpty))
             const Expanded(
               child: Center(
                 child: CircularProgressIndicator(color: Color(0xFF2563EB)),

@@ -857,6 +857,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                         final printUrl = '$url&autoprint=true';
                                                         _launchInvoiceUrl(context, printUrl, inApp: false);
                                                       }
+                                                    } else if (value == 'delete') {
+                                                      if (context.mounted) {
+                                                        _showDeleteConfirmationDialog(context, invoiceId, bill['invoice_number'].toString());
+                                                      }
                                                     }
                                                   },
                                                   itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -890,6 +894,18 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                           Icon(Icons.print_outlined, size: 16, color: Color(0xFF64748B)),
                                                           SizedBox(width: 8),
                                                           Text('Print', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const PopupMenuDivider(),
+                                                    const PopupMenuItem<String>(
+                                                      value: 'delete',
+                                                      height: 36,
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
+                                                          SizedBox(width: 8),
+                                                          Text('Delete Bill', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
                                                         ],
                                                       ),
                                                     ),
@@ -1129,6 +1145,65 @@ class _LedgerScreenState extends State<LedgerScreen> {
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, String invoiceId, String invoiceNumber) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
+              const SizedBox(width: 8),
+              const Text('Delete Bill', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Text('Are you sure you want to delete bill $invoiceNumber? This action will restore product stock levels and cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                setState(() {
+                  _isLoadingLedger = true;
+                });
+                Provider.of<BillingProvider>(context, listen: false)
+                    .deleteInvoice(invoiceId)
+                    .then((success) {
+                  if (!context.mounted) return;
+                  if (success) {
+                    Provider.of<DashboardProvider>(context, listen: false).refreshAll();
+                    if (_selectedCustomer != null) {
+                      _selectCustomer(_selectedCustomer!);
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Bill $invoiceNumber deleted successfully.')),
+                    );
+                  } else {
+                    setState(() {
+                      _isLoadingLedger = false;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to delete bill.')),
+                    );
+                  }
+                });
+              },
+              child: const Text('DELETE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
         );
       },
     );

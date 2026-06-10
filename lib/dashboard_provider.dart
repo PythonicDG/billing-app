@@ -58,9 +58,13 @@ class DashboardProvider with ChangeNotifier {
     fetchDashboardSummary(range: _dashboardRange);
     fetchOutstandingCustomers();
     fetchStockSummary();
+    
+    // Always fetch daily sales for the currently selected date or today
+    String dateToFetch = DateTime.now().toIso8601String().split('T')[0];
     if (_dailySalesData != null && _dailySalesData!['date'] != null) {
-      fetchDailySales(_dailySalesData!['date'].toString());
+      dateToFetch = _dailySalesData!['date'].toString();
     }
+    fetchDailySales(dateToFetch);
   }
 
   Future<void> setDashboardRange(String range) async {
@@ -71,6 +75,7 @@ class DashboardProvider with ChangeNotifier {
   Future<void> fetchDashboardSummary({String? range}) async {
     _isDashboardLoading = true;
     _dashboardError = null;
+    // We don't necessarily want to clear dashboard data as it's the main screen
     notifyListeners();
 
     try {
@@ -92,6 +97,7 @@ class DashboardProvider with ChangeNotifier {
   }
 
   Future<void> fetchDailySales(String date) async {
+    _dailySalesData = null; // Clear old data to force loading state in UI
     _isDailySalesLoading = true;
     _dailySalesError = null;
     notifyListeners();
@@ -115,6 +121,7 @@ class DashboardProvider with ChangeNotifier {
   }
 
   Future<void> fetchOutstandingCustomers() async {
+    _outstandingData = null;
     _isOutstandingLoading = true;
     _outstandingError = null;
     notifyListeners();
@@ -135,6 +142,7 @@ class DashboardProvider with ChangeNotifier {
   }
 
   Future<void> fetchStockSummary() async {
+    _stockData = null;
     _isStockLoading = true;
     _stockError = null;
     notifyListeners();
@@ -155,6 +163,7 @@ class DashboardProvider with ChangeNotifier {
   }
 
   Future<void> fetchCustomerSales(String customerId, String from, String to) async {
+    _customerSalesData = null;
     _isCustomerSalesLoading = true;
     _customerSalesError = null;
     notifyListeners();

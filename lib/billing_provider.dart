@@ -344,4 +344,14 @@ class BillingProvider with ChangeNotifier {
     }
     return false;
   }
+
+  Future<bool> deleteInvoice(String invoiceId) async {
+    try {
+      final response = await _apiService.delete('/api/billing/invoices/$invoiceId/');
+      return response.statusCode == 204 || response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error deleting invoice: $e');
+    }
+    return false;
+  }
 }

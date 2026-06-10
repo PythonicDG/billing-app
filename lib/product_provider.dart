@@ -255,7 +255,7 @@ class ProductProvider with ChangeNotifier {
       fileName: fileName,
     );
     if (response.statusCode == 200) {
-      fetchProducts();
+      fetchPage(_currentPage);
       return true;
     }
     return false;
@@ -264,7 +264,10 @@ class ProductProvider with ChangeNotifier {
   Future<bool> deleteProduct(String uuid) async {
     final response = await _apiService.delete(ApiConstants.productDetailUrl(uuid));
     if (response.statusCode == 204) {
-      fetchProducts();
+      if (_products.length == 1 && _currentPage > 1) {
+        _currentPage--;
+      }
+      fetchPage(_currentPage);
       return true;
     }
     return false;

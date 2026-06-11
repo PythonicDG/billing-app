@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:printing/printing.dart';
 import '../billing_provider.dart';
 import '../dashboard_provider.dart';
-import 'products_screen.dart'; // To use AppDrawer
+import '../widgets/app_drawer.dart';
 
 class LedgerScreen extends StatefulWidget {
   const LedgerScreen({super.key});

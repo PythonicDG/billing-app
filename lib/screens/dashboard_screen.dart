@@ -6,9 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:printing/printing.dart';
 import '../dashboard_provider.dart';
 import '../auth_provider.dart';
-import '../product_provider.dart';
 import '../billing_provider.dart';
-import 'products_screen.dart';
+import '../widgets/app_drawer.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -171,42 +170,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Range Selector Chips
-              Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-                color: Colors.white,
-                margin: const EdgeInsets.only(bottom: 16),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
+              // Integrated Filter & Actions
+              LayoutBuilder(builder: (context, constraints) {
+                bool isWide = constraints.maxWidth > 1000;
+                
+                if (isWide) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_view_day_outlined, size: 18, color: Color(0xFF2563EB)),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Reporting Range: ',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 13.5),
+                        Expanded(
+                          child: _buildReportingRangeCard(provider),
                         ),
                         const SizedBox(width: 16),
-                        _buildRangeChip(provider, 'today', 'Today'),
-                        const SizedBox(width: 8),
-                        _buildRangeChip(provider, 'weekly', 'This Week'),
-                        const SizedBox(width: 8),
-                        _buildRangeChip(provider, 'monthly', 'This Month'),
-                        const SizedBox(width: 8),
-                        _buildRangeChip(provider, 'yearly', 'This Year'),
-                        const SizedBox(width: 8),
-                        _buildRangeChip(provider, 'all_time', 'All Time'),
+                        _buildNewBillButton(width: 160),
+                        const SizedBox(width: 12),
+                        _buildRecentBillsButton(width: 140),
                       ],
                     ),
-                  ),
-                ),
-              ),
-
-              // Quick Action Toolbar
-              _buildQuickActions(),
+                  );
+                } else {
+                  return Column(
+                    children: [
+                      _buildReportingRangeCard(provider),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: _buildNewBillButton()),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildRecentBillsButton()),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  );
+                }
+              }),
 
               // --- Top stat cards (Responsive) ---
               LayoutBuilder(builder: (context, constraints) {
@@ -897,98 +896,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildQuickActions() {
-    return LayoutBuilder(builder: (context, constraints) {
-      bool isWide = constraints.maxWidth > 900;
-      bool isMedium = constraints.maxWidth > 600 && constraints.maxWidth <= 900;
-
-      if (isWide) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
+  Widget _buildReportingRangeCard(DashboardProvider provider) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 0,
+      color: Colors.white,
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              Expanded(child: _buildNewBillButton()),
-              const SizedBox(width: 12),
-              Expanded(flex: 1, child: _buildRecentBillsButton()),
-              const SizedBox(width: 12),
-              Expanded(flex: 2, child: _buildProductSearchField()),
-              const SizedBox(width: 12),
-              Expanded(child: _buildCustomerLinkButton()),
+              const Icon(Icons.calendar_view_day_outlined, size: 18, color: Color(0xFF2563EB)),
+              const SizedBox(width: 8),
+              const Text(
+                'Reporting Range: ',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 13.5),
+              ),
+              const SizedBox(width: 16),
+              _buildRangeChip(provider, 'today', 'Today'),
+              const SizedBox(width: 8),
+              _buildRangeChip(provider, 'weekly', 'This Week'),
+              const SizedBox(width: 8),
+              _buildRangeChip(provider, 'monthly', 'This Month'),
+              const SizedBox(width: 8),
+              _buildRangeChip(provider, 'yearly', 'This Year'),
+              const SizedBox(width: 8),
+              _buildRangeChip(provider, 'all_time', 'All Time'),
             ],
           ),
-        );
-      } else if (isMedium) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(child: _buildNewBillButton()),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildRecentBillsButton()),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(flex: 2, child: _buildProductSearchField()),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildCustomerLinkButton()),
-                ],
-              ),
-            ],
-          ),
-        );
-      } else {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(child: _buildNewBillButton()),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildRecentBillsButton()),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildProductSearchField(),
-              const SizedBox(height: 12),
-              _buildCustomerLinkButton(),
-            ],
-          ),
-        );
-      }
-    });
-  }
-
-  Widget _buildNewBillButton() {
-    return ElevatedButton.icon(
-      onPressed: () => Navigator.pushNamed(context, '/billing'),
-      icon: const Icon(Icons.add_shopping_cart, color: Colors.white, size: 20),
-      label: const Text('NEW BILL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF2563EB),
-        foregroundColor: Colors.white,
-        minimumSize: const Size(double.infinity, 52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 1,
+        ),
       ),
     );
   }
 
-  Widget _buildRecentBillsButton() {
-    return ElevatedButton.icon(
-      onPressed: _showRecentBillsBottomSheet,
-      icon: const Icon(Icons.history, color: Colors.white, size: 20),
-      label: const Text('RECENT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF10B981),
-        foregroundColor: Colors.white,
-        minimumSize: const Size(double.infinity, 52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 1,
+  Widget _buildNewBillButton({double? width}) {
+    return SizedBox(
+      width: width,
+      child: ElevatedButton.icon(
+        onPressed: () => Navigator.pushNamed(context, '/billing'),
+        icon: const Icon(Icons.add_shopping_cart, color: Colors.white, size: 20),
+        label: const Text('NEW BILL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF2563EB),
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentBillsButton({double? width}) {
+    return SizedBox(
+      width: width,
+      child: ElevatedButton.icon(
+        onPressed: _showRecentBillsBottomSheet,
+        icon: const Icon(Icons.history, color: Colors.white, size: 20),
+        label: const Text('RECENT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF10B981),
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 1,
+        ),
       ),
     );
   }
@@ -1206,63 +1180,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Widget _buildCustomerLinkButton() {
-    return OutlinedButton.icon(
-      onPressed: () => Navigator.pushNamed(context, '/ledger'),
-      icon: const Icon(Icons.people_outline, color: Color(0xFF7C3AED), size: 20),
-      label: const Text('CUSTOMERS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF7C3AED),
-        side: const BorderSide(color: Color(0xFF7C3AED), width: 1.5),
-        minimumSize: const Size(double.infinity, 52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  Widget _buildProductSearchField() {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: () {
-          showSearch(
-            context: context,
-            delegate: ProductSearchDelegate(
-              productProvider: Provider.of<ProductProvider>(context, listen: false),
-              currencyFormat: currencyFormat,
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Icon(Icons.search, color: Color(0xFF2563EB), size: 20),
-              SizedBox(width: 12),
-              Text(
-                'Quick Product Search...',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5, fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildRangeChip(DashboardProvider provider, String value, String label) {
     final isSelected = provider.dashboardRange == value;
     return ChoiceChip(
@@ -1284,100 +1201,4 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class ProductSearchDelegate extends SearchDelegate {
-  final ProductProvider productProvider;
-  final NumberFormat currencyFormat;
 
-  ProductSearchDelegate({required this.productProvider, required this.currencyFormat});
-
-  @override
-  List<Widget>? buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () => query = '',
-      ),
-    ];
-  }
-
-  @override
-  Widget? buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () => close(context, null),
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    return _buildSearchList();
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    if (query.isEmpty) {
-      return const Center(child: Text('Search for products by name or brand'));
-    }
-    return _buildSearchList();
-  }
-
-  Widget _buildSearchList() {
-    return FutureBuilder<List<Product>>(
-      future: productProvider.searchProducts(query),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
-        final products = snapshot.data ?? [];
-        if (products.isEmpty) {
-          return const Center(child: Text('No products found'));
-        }
-        return ListView.builder(
-          itemCount: products.length,
-          itemBuilder: (context, index) {
-            final product = products[index];
-            final isOutOfStock = product.totalStockInCent <= 0;
-            final isLowStock = product.totalStockInCent > 0 && product.totalStockInCent <= product.minStockLevel;
-            
-            return ListTile(
-              title: Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('${product.brand} | Stock: ${product.totalStockInCent.toStringAsFixed(1)} cent'),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    currencyFormat.format(product.sellingPrice),
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isOutOfStock ? Colors.red.shade50 : (isLowStock ? Colors.orange.shade50 : Colors.green.shade50),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      isOutOfStock ? 'OUT' : (isLowStock ? 'LOW' : 'IN STOCK'),
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: isOutOfStock ? Colors.red : (isLowStock ? Colors.orange : Colors.green),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              onTap: () {
-                // For now, just show a snackbar with details or close
-                close(context, product);
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-}

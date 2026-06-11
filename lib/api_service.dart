@@ -42,15 +42,14 @@ class ApiService {
 
   Future<http.Response> get(String endpoint, {Map<String, String>? queryParams}) async {
     final headers = await _getHeaders();
-    String queryString = '';
-    if (queryParams != null && queryParams.isNotEmpty) {
-      queryString = '?' + queryParams.entries.map((e) => '${e.key}=${e.value}').join('&');
-    }
     
     // If endpoint is a full URL (from pagination next/previous), use it
-    Uri uri = endpoint.startsWith('http') 
-        ? Uri.parse(endpoint) 
-        : Uri.parse('${ApiConstants.baseUrl}$endpoint$queryString');
+    Uri uri;
+    if (endpoint.startsWith('http')) {
+      uri = Uri.parse(endpoint);
+    } else {
+      uri = Uri.parse('${ApiConstants.baseUrl}$endpoint').replace(queryParameters: queryParams);
+    }
         
     return await http.get(uri, headers: headers);
   }

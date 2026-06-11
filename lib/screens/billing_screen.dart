@@ -8,7 +8,7 @@ import '../billing_provider.dart';
 import '../product_provider.dart';
 import '../auth_provider.dart';
 import '../dashboard_provider.dart';
-import 'products_screen.dart';
+import '../widgets/app_drawer.dart';
 
 class BillingScreen extends StatefulWidget {
   const BillingScreen({super.key});
@@ -122,7 +122,10 @@ class _BillingScreenState extends State<BillingScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     // Apply dynamic filtering locally over loaded products
-    List<Product> displayedProducts = productProvider.products;
+    final String searchQuery = _searchController.text.toLowerCase();
+    List<Product> displayedProducts = productProvider.products.where((p) {
+      return p.name.toLowerCase().contains(searchQuery);
+    }).toList();
 
     double screenWidth = MediaQuery.of(context).size.width;
     bool isWidePOSLayout = screenWidth >= 1024;

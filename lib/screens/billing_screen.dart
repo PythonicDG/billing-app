@@ -1332,7 +1332,7 @@ class _BillingScreenState extends State<BillingScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
           // Live calculation of cash change
-          double paidVal = double.tryParse(_paidAmountController.text) ?? provider.grandTotal;
+          double paidVal = double.tryParse(_paidAmountController.text) ?? 0.0;
           changeAmount = paidVal - provider.grandTotal;
           if (changeAmount < 0) changeAmount = 0.0;
 
@@ -1594,7 +1594,7 @@ class _BillingScreenState extends State<BillingScreen> {
                                     final preview = await provider.previewInvoice(
                                       customerName: _customerNameController.text,
                                       customerPhone: _customerPhoneController.text,
-                                      paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? provider.grandTotal) : provider.grandTotal,
+                                      paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
                                       paymentMethod: _paymentMethod,
                                     );
                                     if (preview != null) {
@@ -1624,7 +1624,7 @@ class _BillingScreenState extends State<BillingScreen> {
                                     final invoiceId = await provider.createInvoice(
                                       customerName: _customerNameController.text,
                                       customerPhone: _customerPhoneController.text,
-                                      paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? provider.grandTotal) : provider.grandTotal,
+                                      paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
                                       paymentMethod: _paymentMethod,
                                     );
                                     if (invoiceId != null) {

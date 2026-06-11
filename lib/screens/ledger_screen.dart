@@ -22,6 +22,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   List<Customer> _customers = [];
   bool _isLoadingCustomers = false;
   Customer? _selectedCustomer;
+  bool _isAllTransactionsMode = false;
   Map<String, dynamic>? _selectedLedger;
   List<dynamic> _allBills = [];
   bool _isLoadingLedger = false;
@@ -51,7 +52,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   void _onScroll() {
     if (_ledgerScrollController.position.pixels >= _ledgerScrollController.position.maxScrollExtent - 200) {
-      if (!_isFetchingMoreLedger && _hasMoreLedger && _selectedCustomer != null) {
+      if (!_isFetchingMoreLedger && _hasMoreLedger && (_selectedCustomer != null || _isAllTransactionsMode)) {
         _fetchMoreLedger();
       }
     }
@@ -88,12 +89,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
         _customers = list;
         _isLoadingCustomers = false;
         
-        // Update selected customer if it exists in the new list to ensure it has latest balance
         if (_selectedCustomer != null) {
           try {
             _selectedCustomer = list.firstWhere((c) => c.id == _selectedCustomer!.id);
           } catch (e) {
-            // Keep existing if not found in filtered list
           }
         }
       });
@@ -107,9 +106,35 @@ class _LedgerScreenState extends State<LedgerScreen> {
     });
   }
 
+  void _selectAllTransactions() {
+    setState(() {
+      _isAllTransactionsMode = true;
+      _selectedCustomer = null;
+      _isLoadingLedger = true;
+      _selectedLedger = null;
+      _allBills = [];
+      _ledgerPage = 1;
+      _hasMoreLedger = true;
+      _expandedInvoiceNumber = null;
+    });
+    Provider.of<BillingProvider>(context, listen: false)
+        .getAllTransactions(page: 1)
+        .then((ledger) {
+      setState(() {
+        if (ledger != null) {
+          _selectedLedger = ledger;
+          _allBills = ledger['bills'] as List? ?? [];
+          _hasMoreLedger = ledger['next'] != null;
+        }
+        _isLoadingLedger = false;
+      });
+    });
+  }
+
   void _selectCustomer(Customer customer) {
     setState(() {
       _selectedCustomer = customer;
+      _isAllTransactionsMode = false;
       _isLoadingLedger = true;
       _selectedLedger = null;
       _allBills = [];
@@ -132,22 +157,24 @@ class _LedgerScreenState extends State<LedgerScreen> {
   }
 
   void _fetchMoreLedger() {
-    if (_selectedCustomer == null || _isFetchingMoreLedger || !_hasMoreLedger) return;
+    if ((_selectedCustomer == null && !_isAllTransactionsMode) || _isFetchingMoreLedger || !_hasMoreLedger) return;
 
     setState(() {
       _isFetchingMoreLedger = true;
     });
 
-    Provider.of<BillingProvider>(context, listen: false)
-        .getCustomerLedger(_selectedCustomer!.id, page: _ledgerPage + 1)
-        .then((ledger) {
+    final Future<Map<String, dynamic>?> fetchFuture = _isAllTransactionsMode
+        ? Provider.of<BillingProvider>(context, listen: false).getAllTransactions(page: _ledgerPage + 1)
+        : Provider.of<BillingProvider>(context, listen: false).getCustomerLedger(_selectedCustomer!.id, page: _ledgerPage + 1);
+
+    fetchFuture.then((ledger) {
       setState(() {
         if (ledger != null) {
           _ledgerPage++;
           final newBills = ledger['bills'] as List? ?? [];
           _allBills.addAll(newBills);
           _hasMoreLedger = ledger['next'] != null;
-          _selectedLedger = ledger; // Update metadata (outstanding etc)
+          _selectedLedger = ledger;
         } else {
           _hasMoreLedger = false;
         }
@@ -160,7 +187,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
     final outstanding = customer.outstandingBalance;
     final message = "Hi ${customer.name}, your outstanding balance at Fataka App is ${currencyFormat.format(outstanding)}. Please settle your pending bills. Thank you!";
     final encodedMessage = Uri.encodeComponent(message);
-    // Format phone number to be international if needed, but for India standard 10 digits usually works with wa.me
     String phone = customer.phone.replaceAll(RegExp(r'[^0-9]'), '');
     if (phone.length == 10) phone = "91$phone";
     
@@ -221,7 +247,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Total Outstanding: ${currencyFormat.format(outstanding)}',
+                        'Total Outstanding: \${currencyFormat.format(outstanding)}',
                         style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFEF4444), fontSize: 14),
                       ),
                       const SizedBox(height: 16),
@@ -342,7 +368,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             const SnackBar(content: Text('Bulk payment recorded successfully')),
                           );
                           
-                          // Refresh customer list to update outstanding balance in the sidebar/list
                           _fetchCustomers(_searchController.text);
                           
                           if (_selectedCustomer != null) {
@@ -528,7 +553,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           const SnackBar(content: Text('Payment recorded successfully')),
                         );
                         
-                        // Refresh customer list to update outstanding balance in the sidebar/list
                         _fetchCustomers(_searchController.text);
                         
                         if (_selectedCustomer != null) {
@@ -556,7 +580,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
 }
 
   Widget _buildCustomerList() {
-    // 1. Filter
     final List<Customer> filteredCustomers = _customers.where((c) {
       if (_filterOption == 'OUTSTANDING') {
         return c.outstandingBalance > 0;
@@ -564,19 +587,16 @@ class _LedgerScreenState extends State<LedgerScreen> {
       return true;
     }).toList();
 
-    // Separate into sections for a cleaner layout
     final outstanding = filteredCustomers.where((c) => c.outstandingBalance > 0).toList();
     final settled = filteredCustomers.where((c) => c.outstandingBalance == 0).toList();
 
-    // Sort: Outstanding by amount (highest first), Settled alphabetically
     outstanding.sort((a, b) => b.outstandingBalance.compareTo(a.outstandingBalance));
     settled.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     return Container(
-      color: const Color(0xFFF8FAFC), // Subtle background for the sidebar
+      color: const Color(0xFFF8FAFC),
       child: Column(
         children: [
-          // Search & Filter Header
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: const BoxDecoration(
@@ -628,11 +648,11 @@ class _LedgerScreenState extends State<LedgerScreen> {
           Expanded(
             child: _isLoadingCustomers
                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 3))
-                : filteredCustomers.isEmpty
-                    ? _buildEmptyState()
-                    : ListView(
+                : ListView(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         children: [
+                          _buildAllTransactionsTile(),
+                          const SizedBox(height: 8),
                           if (outstanding.isNotEmpty) ...[
                              _buildSectionHeader('DUE NOW', Icons.priority_high_rounded, const Color(0xFFEF4444)),
                              ...outstanding.map((c) => _buildCustomerTile(c)),
@@ -642,6 +662,8 @@ class _LedgerScreenState extends State<LedgerScreen> {
                              _buildSectionHeader('FULLY SETTLED', Icons.check_circle_rounded, const Color(0xFF10B981)),
                              ...settled.map((c) => _buildCustomerTile(c)),
                           ],
+                          if (filteredCustomers.isEmpty && outstanding.isEmpty && settled.isEmpty)
+                            _buildEmptyState(),
                         ],
                       ),
           ),
@@ -860,8 +882,55 @@ class _LedgerScreenState extends State<LedgerScreen> {
     );
   }
 
+  Widget _buildAllTransactionsTile() {
+    final isSelected = _isAllTransactionsMode;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        onTap: _selectAllTransactions,
+        leading: CircleAvatar(
+          backgroundColor: isSelected ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9),
+          radius: 20,
+          child: Icon(
+            Icons.receipt_long_rounded,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
+            size: 20,
+          ),
+        ),
+        title: Text(
+          'ALL TRANSACTIONS',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF0F172A),
+            letterSpacing: 0.5,
+          ),
+        ),
+        subtitle: const Text(
+          'View all bills from all customers',
+          style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios_rounded,
+          size: 14,
+          color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLedgerDetail() {
-    if (_selectedCustomer == null) {
+    if (_selectedCustomer == null && !_isAllTransactionsMode) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -869,7 +938,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
             Icon(Icons.receipt_long_outlined, size: 64, color: Color(0xFF94A3B8)),
             SizedBox(height: 16),
             Text(
-              'Select a Customer to view outstanding ledger details',
+              'Select a Customer or \"All Transactions\" to view ledger details',
               style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold),
             ),
           ],
@@ -882,30 +951,20 @@ class _LedgerScreenState extends State<LedgerScreen> {
     }
 
     if (_selectedLedger == null) {
-      return const Center(child: Text('Failed to load ledger information.', style: TextStyle(color: Color(0xFFEF4444))));
+      return const Center(child: Text('Failed to load transaction information.', style: TextStyle(color: Color(0xFFEF4444))));
     }
 
     final bills = _allBills;
     
-    // Compute Summary Stats
-    // We should compute these based on the latest _selectedLedger metadata if available,
-    // or keep client-side calculation if we want it to be based on loaded bills.
-    // The backend now returns total_outstanding correctly for the whole customer.
     double totalBilled = 0.0;
     double totalPaid = 0.0;
     double calculatedOutstanding = double.tryParse(_selectedLedger?['total_outstanding']?.toString() ?? '0.0') ?? 0.0;
     
-    // For total billed/paid, if we only have paginated bills, we can't calculate them correctly client-side
-    // unless the backend provides them.
-    // Let's check what the backend returns.
-    // Currently backend returns total_outstanding but not total_billed/total_paid for all invoices.
-    // We'll calculate it from all LOADED bills for now, but outstanding is from backend.
     for (var bill in bills) {
       totalBilled += double.tryParse(bill['total'].toString()) ?? 0.0;
       totalPaid += double.tryParse(bill['paid'].toString()) ?? 0.0;
     }
 
-    // Apply Filter on Invoice
     final List<dynamic> filteredBills = bills.where((bill) {
       final outstandingVal = double.tryParse(bill['outstanding'].toString()) ?? 0.0;
       if (_invoiceFilter == 'UNPAID_PARTIAL') {
@@ -914,7 +973,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
       return true;
     }).toList();
 
-    // Apply Sorting on Invoice
     filteredBills.sort((a, b) {
       if (_invoiceSort == 'NEWEST') {
         return DateTime.parse(b['date']).compareTo(DateTime.parse(a['date']));
@@ -933,7 +991,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ... (Customer Name/Phone Panel remains same)
           Container(
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -952,18 +1009,21 @@ class _LedgerScreenState extends State<LedgerScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Avatar for consistent look with the list
                 CircleAvatar(
-                  backgroundColor: (calculatedOutstanding > 0) ? const Color(0xFFFEE2E2) : const Color(0xFF2563EB),
+                  backgroundColor: _isAllTransactionsMode 
+                    ? const Color(0xFF2563EB) 
+                    : (calculatedOutstanding > 0 ? const Color(0xFFFEE2E2) : const Color(0xFF2563EB)),
                   radius: 24,
-                  child: Text(
-                    (_selectedLedger!['customer_name'] as String? ?? 'C').substring(0, 1).toUpperCase(),
-                    style: TextStyle(
-                      color: (calculatedOutstanding > 0) ? const Color(0xFFEF4444) : Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
+                  child: _isAllTransactionsMode
+                    ? const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 24)
+                    : Text(
+                        (_selectedLedger!['customer_name'] as String? ?? 'C').substring(0, 1).toUpperCase(),
+                        style: TextStyle(
+                          color: (calculatedOutstanding > 0) ? const Color(0xFFEF4444) : Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -971,54 +1031,56 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _selectedLedger!['customer_name'] ?? '',
+                        _isAllTransactionsMode ? 'All Transactions (Global)' : (_selectedLedger!['customer_name'] ?? ''),
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Phone: ${_selectedLedger!['customer_phone'] ?? ''}',
+                        _isAllTransactionsMode 
+                          ? 'Showing all bills from across the store' 
+                          : 'Phone: ${_selectedLedger!['customer_phone'] ?? ''}',
                         style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.end,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _showStatementPreviewDialog,
-                      icon: const Icon(Icons.description_outlined, size: 18, color: Colors.white),
-                      label: const Text('STATEMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF64748B),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        elevation: 0,
-                      ),
-                    ),
-                    if (calculatedOutstanding > 0)
+                if (!_isAllTransactionsMode)
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
+                    children: [
                       ElevatedButton.icon(
-                        onPressed: _showBulkPaymentDialog,
-                        icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
-                        label: const Text('RECORD BULK PAYMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: _showStatementPreviewDialog,
+                        icon: const Icon(Icons.description_outlined, size: 18, color: Colors.white),
+                        label: const Text('STATEMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
+                          backgroundColor: const Color(0xFF64748B),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           elevation: 0,
                         ),
                       ),
-                  ],
-                ),
+                      if (calculatedOutstanding > 0)
+                        ElevatedButton.icon(
+                          onPressed: _showBulkPaymentDialog,
+                          icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
+                          label: const Text('RECORD BULK PAYMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                        ),
+                    ],
+                  ),
               ],
             ),
           ),
           
-          // Proper Summary Bar Card (Sticky)
           Container(
             margin: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 8),
             padding: const EdgeInsets.all(16),
@@ -1076,7 +1138,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'TOTAL OUTSTANDING',
+                            _isAllTransactionsMode ? 'REMAINING DUE (LOADED)' : 'TOTAL OUTSTANDING',
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
@@ -1085,7 +1147,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            currencyFormat.format(calculatedOutstanding),
+                            currencyFormat.format(_isAllTransactionsMode ? (totalBilled - totalPaid) : calculatedOutstanding),
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1101,13 +1163,11 @@ class _LedgerScreenState extends State<LedgerScreen> {
             ),
           ),
 
-          // Search, Filter and Sort Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Filter Dropdown
                 Row(
                   children: [
                     const Text('Filter: ', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
@@ -1126,7 +1186,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     ),
                   ],
                 ),
-                // Sort Dropdown
                 Row(
                   children: [
                     const Text('Sort: ', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
@@ -1150,7 +1209,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
             ),
           ),
 
-          // Custom Expandable Table-like Rows
           Expanded(
             child: filteredBills.isEmpty
                 ? Center(
@@ -1160,7 +1218,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         Icon(Icons.receipt_long_outlined, size: 64, color: Color(0xFF94A3B8)),
                         SizedBox(height: 16),
                         Text(
-                          'No invoices found for this customer',
+                          'No invoices found',
                           style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                       ],
@@ -1168,7 +1226,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   )
                 : Column(
                     children: [
-                      // Header Card Style
                       Container(
                         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1177,19 +1234,21 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
-                          children: const [
-                            Expanded(flex: 3, child: Text('DATE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
-                            Expanded(flex: 3, child: Text('BILL NUMBER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
-                            Expanded(flex: 3, child: Text('TOTAL AMOUNT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
-                            Expanded(flex: 3, child: Text('PAID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
-                            Expanded(flex: 3, child: Text('OUTSTANDING', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
-                            Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
-                            Expanded(flex: 2, child: Text('PREVIEW', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                          children: [
+                            const Expanded(flex: 3, child: Text('DATE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            if (_isAllTransactionsMode)
+                              const Expanded(flex: 4, child: Text('CUSTOMER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569))))
+                            else
+                              const Expanded(flex: 3, child: Text('BILL NUMBER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            const Expanded(flex: 3, child: Text('TOTAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            const Expanded(flex: 3, child: Text('PAID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            const Expanded(flex: 3, child: Text('DUE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            const Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
+                            const Expanded(flex: 2, child: Text('ACTION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
                           ],
                         ),
                       ),
                       
-                      // Rows List
                       Expanded(
                         child: ListView.builder(
                           controller: _ledgerScrollController,
@@ -1211,7 +1270,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             final paid = double.tryParse(bill['paid'].toString()) ?? 0.0;
                             final outstanding = double.tryParse(bill['outstanding'].toString()) ?? 0.0;
                             
-                            // Status Badge
                             String statusLabel = 'PAID';
                             Color badgeBg = const Color(0xFFDCFCE7);
                             Color badgeText = const Color(0xFF16A34A);
@@ -1228,18 +1286,15 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             }
 
                             final payments = bill['payments'] as List? ?? [];
-                            final double totalPaid = double.tryParse(bill['paid'].toString()) ?? 0.0;
+                            final double totalPaidForPayments = double.tryParse(bill['paid'].toString()) ?? 0.0;
                             
-                            // Calculate sum of recorded payments in database
                             double recordedPaymentsSum = 0.0;
                             for (var p in payments) {
                               recordedPaymentsSum += double.tryParse(p['amount']?.toString() ?? '0.0') ?? 0.0;
                             }
                             
-                            // Virtualized initial payment
-                            final double initialPaid = totalPaid - recordedPaymentsSum;
+                            final double initialPaid = totalPaidForPayments - recordedPaymentsSum;
                             
-                            // Create unified payments list
                             final List<Map<String, dynamic>> unifiedPayments = [];
                             if (initialPaid > 0.01) {
                               unifiedPayments.add({
@@ -1279,7 +1334,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 child: Column(
                                   children: [
-                                    // Clickable Header Row
                                     InkWell(
                                       onTap: () {
                                         setState(() {
@@ -1291,7 +1345,20 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                         child: Row(
                                           children: [
                                             Expanded(flex: 3, child: Text(dateStr, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
-                                            Expanded(flex: 3, child: Text(bill['invoice_number'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)))),
+                                            if (_isAllTransactionsMode)
+                                              Expanded(
+                                                flex: 4, 
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(bill['customer_name']?.toString() ?? 'Guest', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                                                    Text(bill['invoice_number'].toString(), style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                                  ],
+                                                )
+                                              )
+                                            else
+                                              Expanded(flex: 3, child: Text(bill['invoice_number'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)))),
+                                            
                                             Expanded(flex: 3, child: Text(currencyFormat.format(total), style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
                                             Expanded(flex: 3, child: Text(currencyFormat.format(paid), style: const TextStyle(fontSize: 13, color: Color(0xFF16A34A)))),
                                             Expanded(
@@ -1329,10 +1396,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                               child: Align(
                                                 alignment: Alignment.centerLeft,
                                                 child: GestureDetector(
-                                                  onTap: () {}, // Prevents expansion/collapse of the row
+                                                  onTap: () {},
                                                   child: PopupMenuButton<String>(
-                                                    icon: const Icon(Icons.visibility_outlined, size: 20, color: Color(0xFF64748B)),
-                                                    tooltip: 'Preview Invoice',
+                                                    icon: const Icon(Icons.more_vert_rounded, size: 20, color: Color(0xFF64748B)),
+                                                    tooltip: 'Actions',
                                                     onSelected: (value) async {
                                                       final provider = Provider.of<BillingProvider>(context, listen: false);
                                                       final invoiceId = bill['id'].toString();
@@ -1346,7 +1413,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                       } else if (value == 'print') {
                                                         final url = await provider.getInvoicePrintHtmlUrl(invoiceId);
                                                         if (context.mounted && url != null) {
-                                                          final printUrl = '$url&autoprint=true';
+                                                          final printUrl = '\$url&autoprint=true';
                                                           _launchInvoiceUrl(context, printUrl, inApp: false);
                                                         }
                                                       } else if (value == 'delete') {
@@ -1363,7 +1430,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                           children: [
                                                             Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
                                                             SizedBox(width: 8),
-                                                            Text('View inside app', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                            Text('View', style: TextStyle(fontSize: 12)),
                                                           ],
                                                         ),
                                                       ),
@@ -1374,7 +1441,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                           children: [
                                                             Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF64748B)),
                                                             SizedBox(width: 8),
-                                                            Text('Download PDF', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                            Text('Download', style: TextStyle(fontSize: 12)),
                                                           ],
                                                         ),
                                                       ),
@@ -1385,7 +1452,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                           children: [
                                                             Icon(Icons.print_outlined, size: 16, color: Color(0xFF64748B)),
                                                             SizedBox(width: 8),
-                                                            Text('Print', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                            Text('Print', style: TextStyle(fontSize: 12)),
                                                           ],
                                                         ),
                                                       ),
@@ -1397,7 +1464,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                           children: [
                                                             Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
                                                             SizedBox(width: 8),
-                                                            Text('Delete Bill', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+                                                            Text('Delete', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
                                                           ],
                                                         ),
                                                       ),
@@ -1411,7 +1478,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                       ),
                                     ),
                                     
-                                    // Inline Expanded Payment History & Action Panel
                                     if (isExpanded)
                                       Container(
                                         padding: const EdgeInsets.all(16),
@@ -1557,7 +1623,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             color: Colors.black.withOpacity(0.03),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
-                          ),
+                        ),
                         ],
                       ),
                       child: ClipRRect(
@@ -1569,12 +1635,13 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 ],
               ),
             )
-          : _selectedCustomer == null
+          : _selectedCustomer == null && !_isAllTransactionsMode
               ? _buildCustomerList()
               : WillPopScope(
                   onWillPop: () async {
                     setState(() {
                       _selectedCustomer = null;
+                      _isAllTransactionsMode = false;
                       _selectedLedger = null;
                     });
                     return false;
@@ -1605,7 +1672,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: \$e')));
       }
     }
   }
@@ -1637,7 +1704,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444)),
                         const SizedBox(width: 8),
                         Text(
-                          'Invoice Preview - $invoiceNumber',
+                          'Invoice Preview - \$invoiceNumber',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                       ],
@@ -1669,7 +1736,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     onError: (context, error) {
                       return Center(
                         child: Text(
-                          'Error loading PDF: $error',
+                          'Error loading PDF: \$error',
                           style: const TextStyle(color: Colors.red),
                         ),
                       );
@@ -1698,7 +1765,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
               Text('Confirm Delete', style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
-          content: Text('Are you sure you want to delete bill $invoiceNumber?\n\nThis action cannot be undone and will restore the product stock quantities.'),
+          content: Text('Are you sure you want to delete bill \$invoiceNumber?\\n\\nThis action cannot be undone and will restore the product stock quantities.'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
@@ -1737,11 +1804,11 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
-                    // Refresh ledger
                     if (_selectedCustomer != null) {
                       _selectCustomer(_selectedCustomer!);
-                      // Also refresh customers list to update balances
                       _fetchCustomers(_searchController.text);
+                    } else if (_isAllTransactionsMode) {
+                      _selectAllTransactions();
                     }
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1797,7 +1864,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           const Icon(Icons.description_outlined, color: Color(0xFF2563EB)),
                           const SizedBox(width: 8),
                           Text(
-                            'Statement Preview - ${_selectedCustomer!.name}',
+                            'Statement Preview - \${_selectedCustomer!.name}',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                         ],
@@ -1829,7 +1896,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       onError: (context, error) {
                         return Center(
                           child: Text(
-                            'Error loading PDF: $error',
+                            'Error loading PDF: \$error',
                             style: const TextStyle(color: Colors.red),
                           ),
                         );

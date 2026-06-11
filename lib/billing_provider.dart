@@ -349,6 +349,21 @@ class BillingProvider with ChangeNotifier {
     return null;
   }
 
+  Future<Map<String, dynamic>?> getAllTransactions({int page = 1}) async {
+    try {
+      final response = await _apiService.get(
+        '/api/invoices/all_transactions/',
+        queryParams: {'page': page.toString()},
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('Error fetching all transactions: $e');
+    }
+    return null;
+  }
+
   Future<bool> recordPayment(String invoiceId, double amount, String mode, String notes) async {
     try {
       final response = await _apiService.post(

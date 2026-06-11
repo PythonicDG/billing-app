@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../product_provider.dart';
@@ -16,6 +17,7 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
   final _searchController = TextEditingController();
+  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
   String _activeOrdering = 'created_at';
   Timer? _debounce;
 
@@ -26,6 +28,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       final productProvider = Provider.of<ProductProvider>(context, listen: false);
       productProvider.fetchProducts(pageSize: 12);
       productProvider.fetchCategories();
+      productProvider.fetchInventoryAnalytics();
     });
   }
 
@@ -34,6 +37,140 @@ class _ProductsScreenState extends State<ProductsScreen> {
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required Color valueColor,
+    required Color accentColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF94A3B8),
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: valueColor,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCards(ProductProvider provider) {
+    final analytics = provider.inventoryAnalytics;
+    if (analytics == null) return const SizedBox.shrink();
+
+    final totalValue = (analytics['total_inventory_value'] as num?)?.toDouble() ?? 0.0;
+    final potentialRevenue = (analytics['potential_revenue'] as num?)?.toDouble() ?? 0.0;
+    final lowStockCount = (analytics['low_stock_items'] as num?)?.toInt() ?? 0;
+    final outOfStockCount = (analytics['out_of_stock_items'] as num?)?.toInt() ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          int crossAxisCount = 4;
+          if (constraints.maxWidth < 600) {
+            crossAxisCount = 1;
+          } else if (constraints.maxWidth < 1000) {
+            crossAxisCount = 2;
+          }
+
+          return GridView.count(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            childAspectRatio: crossAxisCount == 1 ? 4.5 : 2.5,
+            children: [
+              _buildStatCard(
+                icon: Icons.account_balance_wallet_outlined,
+                iconColor: const Color(0xFF2563EB),
+                label: 'TOTAL INV. VALUE',
+                value: currencyFormat.format(totalValue),
+                valueColor: const Color(0xFF0F172A),
+                accentColor: const Color(0xFF2563EB),
+              ),
+              _buildStatCard(
+                icon: Icons.trending_up_outlined,
+                iconColor: const Color(0xFF10B981),
+                label: 'POTENTIAL REVENUE',
+                value: currencyFormat.format(potentialRevenue),
+                valueColor: const Color(0xFF059669),
+                accentColor: const Color(0xFF10B981),
+              ),
+              _buildStatCard(
+                icon: Icons.warning_amber_outlined,
+                iconColor: const Color(0xFFF59E0B),
+                label: 'LOW STOCK ITEMS',
+                value: lowStockCount.toString(),
+                valueColor: const Color(0xFFD97706),
+                accentColor: const Color(0xFFF59E0B),
+              ),
+              _buildStatCard(
+                icon: Icons.error_outline,
+                iconColor: const Color(0xFFEF4444),
+                label: 'OUT OF STOCK',
+                value: outOfStockCount.toString(),
+                valueColor: const Color(0xFFDC2626),
+                accentColor: const Color(0xFFEF4444),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -68,6 +205,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             tooltip: 'Refresh',
             onPressed: () {
               Provider.of<ProductProvider>(context, listen: false).fetchProducts(pageSize: 12);
+              Provider.of<ProductProvider>(context, listen: false).fetchInventoryAnalytics();
             },
           ),
           if (isOwner) ...[
@@ -179,6 +317,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
           ),
           
+          _buildSummaryCards(productProvider),
 
           // Inventory Header Summary
           Padding(
@@ -318,6 +457,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                             final isOutOfStock = product.totalStockInCent <= 0;
                                             final isLowStock = product.totalStockInCent > 0 && product.totalStockInCent <= product.minStockLevel;
                                             return DataRow(
+                                              color: WidgetStateProperty.resolveWith<Color?>((states) {
+                                                if (isOutOfStock) return const Color(0xFFFEF2F2);
+                                                if (isLowStock) return const Color(0xFFFFF7ED);
+                                                return null;
+                                              }),
                                               cells: [
                                                 DataCell(SizedBox(width: prodWidth, child: Text(product.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5), overflow: TextOverflow.ellipsis))),
                                                 DataCell(
@@ -400,6 +544,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                       child: Row(
                                                         mainAxisSize: MainAxisSize.min,
                                                         children: [
+                                                          IconButton(
+                                                            icon: const Icon(Icons.add_business_outlined, color: Color(0xFF059669), size: 18),
+                                                            tooltip: 'Restock',
+                                                            onPressed: () => _showRestockDialog(context, product),
+                                                            constraints: const BoxConstraints(),
+                                                            padding: const EdgeInsets.all(4),
+                                                          ),
                                                           IconButton(
                                                             icon: const Icon(Icons.edit_outlined, color: Color(0xFF2563EB), size: 18),
                                                             onPressed: () => _showProductForm(context, product: product),
@@ -1019,6 +1170,137 @@ class _ProductsScreenState extends State<ProductsScreen> {
           },
         );
       },
+    );
+  }
+
+  void _showRestockDialog(BuildContext context, Product product) {
+    final _formKey = GlobalKey<FormState>();
+    int additionalCases = 0;
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.add_business_outlined, color: Color(0xFF059669)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Restock: ${product.name}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildRestockInfoRow('Current Cases', '${product.noOfCase} cs'),
+                      const SizedBox(height: 4),
+                      _buildRestockInfoRow('Total Stock', '${product.totalStockInCent.toStringAsFixed(1)} cent'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  decoration: InputDecoration(
+                    labelText: 'Additional Cases to Add',
+                    hintText: 'e.g. 5',
+                    prefixIcon: const Icon(Icons.inventory_2_outlined),
+                    suffixText: 'cs',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Enter quantity';
+                    final n = int.tryParse(value);
+                    if (n == null || n < 0) return 'Enter a valid positive number';
+                    return null;
+                  },
+                  onSaved: (value) => additionalCases = int.parse(value!),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (_formKey.currentState!.validate()) {
+                        _formKey.currentState!.save();
+                        setDialogState(() => isSubmitting = true);
+
+                        final provider = Provider.of<ProductProvider>(context, listen: false);
+                        final success = await provider.updateProduct(product.uuid, {
+                          'no_of_case': product.noOfCase + additionalCases,
+                        });
+
+                        if (success) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${product.name} restocked by $additionalCases cases!'),
+                              backgroundColor: const Color(0xFF059669),
+                            ),
+                          );
+                        } else {
+                          setDialogState(() => isSubmitting = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Failed to update stock. Please try again.'),
+                              backgroundColor: Color(0xFFEF4444),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('CONFIRM RESTOCK', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRestockInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+      ],
     );
   }
 

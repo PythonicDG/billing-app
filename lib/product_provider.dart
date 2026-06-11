@@ -91,6 +91,8 @@ class ProductProvider with ChangeNotifier {
   int _currentPage = 1;
   int _totalCount = 0;
 
+  Map<String, dynamic>? _inventoryAnalytics;
+
   List<Product> get products => _products;
   List<Product> get frequentProducts => _frequentProducts;
   List<Category> get categoriesList => _categoriesList;
@@ -100,6 +102,22 @@ class ProductProvider with ChangeNotifier {
   int get currentPage => _currentPage;
   int get totalCount => _totalCount;
   int get totalPages => (_totalCount / _pageSize).ceil().clamp(1, 99999);
+  Map<String, dynamic>? get inventoryAnalytics => _inventoryAnalytics;
+
+  Future<void> fetchInventoryAnalytics() async {
+    try {
+      final response = await _apiService.get('/api/products/health_analytics/');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          _inventoryAnalytics = data['data'];
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching inventory analytics: $e');
+    }
+  }
 
   Future<void> fetchCategories() async {
     try {
@@ -280,6 +298,7 @@ class ProductProvider with ChangeNotifier {
     );
     if (response.statusCode == 201) {
       fetchProducts();
+      fetchInventoryAnalytics();
       return true;
     }
     return false;
@@ -296,6 +315,7 @@ class ProductProvider with ChangeNotifier {
     );
     if (response.statusCode == 200) {
       fetchPage(_currentPage);
+      fetchInventoryAnalytics();
       return true;
     }
     return false;
@@ -308,6 +328,7 @@ class ProductProvider with ChangeNotifier {
         _currentPage--;
       }
       fetchPage(_currentPage);
+      fetchInventoryAnalytics();
       return true;
     }
     return false;

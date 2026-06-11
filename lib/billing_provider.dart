@@ -354,4 +354,24 @@ class BillingProvider with ChangeNotifier {
     }
     return false;
   }
+
+  Future<List<Map<String, dynamic>>> fetchRecentInvoices({int limit = 10}) async {
+    try {
+      final response = await _apiService.get(
+        ApiConstants.invoicesUrl,
+        queryParams: {'page_size': limit.toString()},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('results')) {
+          return List<Map<String, dynamic>>.from(data['results']);
+        } else if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching recent invoices: $e');
+    }
+    return [];
+  }
 }

@@ -229,6 +229,31 @@ class ProductProvider with ChangeNotifier {
     fetchProducts();
   }
 
+  Future<List<Product>> searchProducts(String query) async {
+    try {
+      final response = await _apiService.get(
+        ApiConstants.productsUrl,
+        queryParams: {
+          'search': query,
+          'page_size': '20',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('results')) {
+          final results = data['results'] as List;
+          return results.map((p) => Product.fromJson(p)).toList();
+        } else if (data is List) {
+          return data.map((p) => Product.fromJson(p)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error searching products: $e');
+    }
+    return [];
+  }
+
   Future<bool> addProduct(Map<String, dynamic> data, {Uint8List? fileBytes, String? fileName}) async {
     final fields = data.map((key, value) => MapEntry(key, value.toString()));
     final response = await _apiService.multipartRequest(

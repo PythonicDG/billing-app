@@ -39,18 +39,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _loadDashboard({String? range}) {
     final provider = Provider.of<DashboardProvider>(context, listen: false);
-    final Future<void> future = range != null
-        ? provider.setDashboardRange(range)
-        : provider.fetchDashboardSummary();
-        
-    future.then((_) {
-      if (mounted) {
-        setState(() {
-          _lastRefreshed = DateTime.now();
-          _stockCurrentPage = 1; // Reset pagination page when new data loads
-        });
-      }
-    });
+    
+    // Explicitly set the range in the provider and fetch data
+    if (range != null) {
+      provider.setDashboardRange(range).then((_) {
+        if (mounted) {
+          setState(() {
+            _lastRefreshed = DateTime.now();
+            _stockCurrentPage = 1;
+          });
+        }
+      });
+    } else {
+      provider.fetchDashboardSummary().then((_) {
+        if (mounted) {
+          setState(() {
+            _lastRefreshed = DateTime.now();
+            _stockCurrentPage = 1;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -141,6 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     final todaySales = (data['today_sales'] as num?)?.toDouble() ?? 0.0;
+    final todayProfit = (data['today_profit'] as num?)?.toDouble() ?? 0.0;
     final todayCash = (data['today_cash'] as num?)?.toDouble() ?? 0.0;
     final todayUpi = (data['today_upi'] as num?)?.toDouble() ?? 0.0;
     final todayBillCount = (data['today_bill_count'] as num?)?.toInt() ?? 0;
@@ -149,7 +159,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final topProducts = data['top_products_today'] as List? ?? [];
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -158,7 +168,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             elevation: 0,
             color: Colors.white,
-            margin: const EdgeInsets.only(bottom: 20),
+            margin: const EdgeInsets.only(bottom: 16),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: SingleChildScrollView(
@@ -187,51 +197,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
-          // --- Top stat cards ---
-          Row(
-            children: [
-              Expanded(child: _buildStatCard(
-                icon: Icons.trending_up_outlined,
-                iconColor: const Color(0xFF2563EB),
-                label: data['sales_label']?.toString().toUpperCase() ?? "TODAY'S SALES",
-                value: currencyFormat.format(todaySales),
-                valueColor: const Color(0xFF0F172A),
-                accentColor: const Color(0xFF2563EB),
-              )),
-              const SizedBox(width: 16),
-              Expanded(child: _buildStatCard(
-                icon: Icons.receipt_long_outlined,
-                iconColor: const Color(0xFF7C3AED),
-                label: data['bills_label']?.toString().toUpperCase() ?? "BILLS CREATED",
-                value: todayBillCount.toString(),
-                valueColor: const Color(0xFF0F172A),
-                accentColor: const Color(0xFF7C3AED),
-              )),
-              const SizedBox(width: 16),
-              Expanded(child: _buildStatCard(
-                icon: Icons.money_outlined,
-                iconColor: const Color(0xFF16A34A),
-                label: data['cash_label']?.toString().toUpperCase() ?? "CASH COLLECTED",
-                value: currencyFormat.format(todayCash),
-                valueColor: const Color(0xFF16A34A),
-                accentColor: const Color(0xFF16A34A),
-              )),
-              const SizedBox(width: 16),
-              Expanded(child: _buildStatCard(
-                icon: Icons.qr_code_outlined,
-                iconColor: const Color(0xFF0891B2),
-                label: data['upi_label']?.toString().toUpperCase() ?? "UPI COLLECTED",
-                value: currencyFormat.format(todayUpi),
-                valueColor: const Color(0xFF0891B2),
-                accentColor: const Color(0xFF0891B2),
-              )),
-            ],
-          ),
-          const SizedBox(height: 20),
+          // --- Top stat cards (Responsive) ---
+          LayoutBuilder(builder: (context, constraints) {
+            int crossAxisCount = 2;
+            if (constraints.maxWidth > 1200) {
+              crossAxisCount = 5;
+            } else if (constraints.maxWidth > 900) {
+              crossAxisCount = 3;
+            } else if (constraints.maxWidth > 600) {
+              crossAxisCount = 2;
+            } else {
+              crossAxisCount = 1;
+            }
+
+            double spacing = 16.0;
+            return GridView.count(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: crossAxisCount == 1 ? 4.0 : (crossAxisCount == 5 ? 1.8 : 2.8),
+              children: [
+                _buildStatCard(
+                  icon: Icons.trending_up_outlined,
+                  iconColor: const Color(0xFF2563EB),
+                  label: data['sales_label']?.toString().toUpperCase() ?? "TODAY'S SALES",
+                  value: currencyFormat.format(todaySales),
+                  valueColor: const Color(0xFF0F172A),
+                  accentColor: const Color(0xFF2563EB),
+                ),
+                _buildStatCard(
+                  icon: Icons.insights_outlined,
+                  iconColor: const Color(0xFF10B981),
+                  label: data['profit_label']?.toString().toUpperCase() ?? "EST. PROFIT",
+                  value: currencyFormat.format(todayProfit),
+                  valueColor: const Color(0xFF059669),
+                  accentColor: const Color(0xFF10B981),
+                ),
+                _buildStatCard(
+                  icon: Icons.receipt_long_outlined,
+                  iconColor: const Color(0xFF7C3AED),
+                  label: data['bills_label']?.toString().toUpperCase() ?? "BILLS CREATED",
+                  value: todayBillCount.toString(),
+                  valueColor: const Color(0xFF0F172A),
+                  accentColor: const Color(0xFF7C3AED),
+                ),
+                _buildStatCard(
+                  icon: Icons.money_outlined,
+                  iconColor: const Color(0xFF16A34A),
+                  label: data['cash_label']?.toString().toUpperCase() ?? "CASH COLLECTED",
+                  value: currencyFormat.format(todayCash),
+                  valueColor: const Color(0xFF16A34A),
+                  accentColor: const Color(0xFF16A34A),
+                ),
+                _buildStatCard(
+                  icon: Icons.qr_code_outlined,
+                  iconColor: const Color(0xFF0891B2),
+                  label: data['upi_label']?.toString().toUpperCase() ?? "UPI COLLECTED",
+                  value: currencyFormat.format(todayUpi),
+                  valueColor: const Color(0xFF0891B2),
+                  accentColor: const Color(0xFF0891B2),
+                ),
+              ],
+            );
+          }),
+          const SizedBox(height: 16),
 
           // --- Outstanding card ---
           _buildOutstandingCard(totalOutstanding),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           // --- Side-by-side or stacked responsive layout for Stock Status & Top Products ---
           LayoutBuilder(
@@ -253,7 +288,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 return Column(
                   children: [
                     stockWidget,
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     topProductsWidget,
                   ],
                 );
@@ -274,7 +309,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Color accentColor,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -290,18 +325,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: accentColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   label,
@@ -312,11 +348,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     letterSpacing: 0.8,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: valueColor,
                   ),
@@ -336,7 +372,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: isPositive ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
         borderRadius: BorderRadius.circular(10),
@@ -354,8 +390,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: isPositive
                   ? const Color(0xFFEF4444).withOpacity(0.12)
@@ -365,10 +401,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Icon(
               isPositive ? Icons.warning_amber_outlined : Icons.check_circle_outline,
               color: isPositive ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
-              size: 28,
+              size: 22,
             ),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,7 +412,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   'TOTAL OUTSTANDING',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: isPositive ? const Color(0xFFB91C1C) : const Color(0xFF15803D),
                     letterSpacing: 0.8,
@@ -386,7 +422,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(
                   currencyFormat.format(totalOutstanding),
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: isPositive ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
                   ),

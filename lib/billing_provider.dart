@@ -334,9 +334,12 @@ class BillingProvider with ChangeNotifier {
     return [];
   }
 
-  Future<Map<String, dynamic>?> getCustomerLedger(String customerId) async {
+  Future<Map<String, dynamic>?> getCustomerLedger(String customerId, {int page = 1}) async {
     try {
-      final response = await _apiService.get('/api/customers/$customerId/ledger/');
+      final response = await _apiService.get(
+        '/api/customers/$customerId/ledger/',
+        queryParams: {'page': page.toString()},
+      );
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }

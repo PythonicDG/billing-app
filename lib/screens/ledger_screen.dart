@@ -18,11 +18,16 @@ class LedgerScreen extends StatefulWidget {
 
 class _LedgerScreenState extends State<LedgerScreen> {
   final _searchController = TextEditingController();
+  final _ledgerScrollController = ScrollController();
   List<Customer> _customers = [];
   bool _isLoadingCustomers = false;
   Customer? _selectedCustomer;
   Map<String, dynamic>? _selectedLedger;
+  List<dynamic> _allBills = [];
   bool _isLoadingLedger = false;
+  bool _isFetchingMoreLedger = false;
+  int _ledgerPage = 1;
+  bool _hasMoreLedger = true;
   Timer? _debounce;
 
   // Filter and Sorting State
@@ -41,6 +46,15 @@ class _LedgerScreenState extends State<LedgerScreen> {
   void initState() {
     super.initState();
     _fetchCustomers();
+    _ledgerScrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_ledgerScrollController.position.pixels >= _ledgerScrollController.position.maxScrollExtent - 200) {
+      if (!_isFetchingMoreLedger && _hasMoreLedger && _selectedCustomer != null) {
+        _fetchMoreLedger();
+      }
+    }
   }
 
   @override
@@ -59,6 +73,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _ledgerScrollController.dispose();
     super.dispose();
   }
 
@@ -97,14 +112,46 @@ class _LedgerScreenState extends State<LedgerScreen> {
       _selectedCustomer = customer;
       _isLoadingLedger = true;
       _selectedLedger = null;
+      _allBills = [];
+      _ledgerPage = 1;
+      _hasMoreLedger = true;
       _expandedInvoiceNumber = null;
     });
     Provider.of<BillingProvider>(context, listen: false)
-        .getCustomerLedger(customer.id)
+        .getCustomerLedger(customer.id, page: 1)
         .then((ledger) {
       setState(() {
-        _selectedLedger = ledger;
+        if (ledger != null) {
+          _selectedLedger = ledger;
+          _allBills = ledger['bills'] as List? ?? [];
+          _hasMoreLedger = ledger['next'] != null;
+        }
         _isLoadingLedger = false;
+      });
+    });
+  }
+
+  void _fetchMoreLedger() {
+    if (_selectedCustomer == null || _isFetchingMoreLedger || !_hasMoreLedger) return;
+
+    setState(() {
+      _isFetchingMoreLedger = true;
+    });
+
+    Provider.of<BillingProvider>(context, listen: false)
+        .getCustomerLedger(_selectedCustomer!.id, page: _ledgerPage + 1)
+        .then((ledger) {
+      setState(() {
+        if (ledger != null) {
+          _ledgerPage++;
+          final newBills = ledger['bills'] as List? ?? [];
+          _allBills.addAll(newBills);
+          _hasMoreLedger = ledger['next'] != null;
+          _selectedLedger = ledger; // Update metadata (outstanding etc)
+        } else {
+          _hasMoreLedger = false;
+        }
+        _isFetchingMoreLedger = false;
       });
     });
   }
@@ -838,16 +885,24 @@ class _LedgerScreenState extends State<LedgerScreen> {
       return const Center(child: Text('Failed to load ledger information.', style: TextStyle(color: Color(0xFFEF4444))));
     }
 
-    final bills = _selectedLedger!['bills'] as List? ?? [];
+    final bills = _allBills;
     
     // Compute Summary Stats
+    // We should compute these based on the latest _selectedLedger metadata if available,
+    // or keep client-side calculation if we want it to be based on loaded bills.
+    // The backend now returns total_outstanding correctly for the whole customer.
     double totalBilled = 0.0;
     double totalPaid = 0.0;
-    double calculatedOutstanding = 0.0;
+    double calculatedOutstanding = double.tryParse(_selectedLedger?['total_outstanding']?.toString() ?? '0.0') ?? 0.0;
+    
+    // For total billed/paid, if we only have paginated bills, we can't calculate them correctly client-side
+    // unless the backend provides them.
+    // Let's check what the backend returns.
+    // Currently backend returns total_outstanding but not total_billed/total_paid for all invoices.
+    // We'll calculate it from all LOADED bills for now, but outstanding is from backend.
     for (var bill in bills) {
       totalBilled += double.tryParse(bill['total'].toString()) ?? 0.0;
       totalPaid += double.tryParse(bill['paid'].toString()) ?? 0.0;
-      calculatedOutstanding += double.tryParse(bill['outstanding'].toString()) ?? 0.0;
     }
 
     // Apply Filter on Invoice
@@ -878,7 +933,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Customer Name/Phone Panel with Actions (Card Style)
+          // ... (Customer Name/Phone Panel remains same)
           Container(
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -980,7 +1035,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('TOTAL BILLED', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                        const Text('TOTAL BILLED (LOADED)', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
                         const SizedBox(height: 4),
                         Text(
                           currencyFormat.format(totalBilled),
@@ -997,7 +1052,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('TOTAL PAID', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                      const Text('TOTAL PAID (LOADED)', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
                       const SizedBox(height: 4),
                       Text(
                         currencyFormat.format(totalPaid),
@@ -1021,7 +1076,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'OUTSTANDING',
+                            'TOTAL OUTSTANDING',
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
@@ -1137,9 +1192,18 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       // Rows List
                       Expanded(
                         child: ListView.builder(
+                          controller: _ledgerScrollController,
                           padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: filteredBills.length,
+                          itemCount: filteredBills.length + (_hasMoreLedger ? 1 : 0),
                           itemBuilder: (context, index) {
+                            if (index == filteredBills.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+                            }
                             final bill = filteredBills[index];
                             final isExpanded = _expandedInvoiceNumber == bill['invoice_number'];
                             final dateStr = DateFormat('dd MMM yyyy').format(DateTime.parse(bill['date']).toLocal());

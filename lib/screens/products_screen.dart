@@ -176,9 +176,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   @override
   Widget build(BuildContext context) {
     final productProvider = Provider.of<ProductProvider>(context);
-    final isOwner = true;
-
-
+    const isOwner = true;
 
     return Scaffold(
       appBar: AppBar(
@@ -207,6 +205,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
               Provider.of<ProductProvider>(context, listen: false).fetchProducts(pageSize: 12);
               Provider.of<ProductProvider>(context, listen: false).fetchInventoryAnalytics();
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.download_outlined, color: Color(0xFF059669)),
+            tooltip: 'Export Inventory (CSV)',
+            onPressed: () => _handleExport(context, productProvider),
           ),
           if (isOwner) ...[
             IconButton(
@@ -369,17 +372,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Products listed: ${productProvider.products.length}',
+                  'Total Products: ${productProvider.totalCount}',
                   style: const TextStyle(
                     color: Color(0xFF64748B), // Slate 500
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (_searchController.text.isNotEmpty)
-                  const Text(
-                    'Search filters active',
-                    style: TextStyle(
+                if (_searchController.text.isNotEmpty || productProvider.stockFilter != 'all')
+                  Text(
+                    _searchController.text.isNotEmpty ? 'Search active' : 'Filter: ${productProvider.stockFilter.replaceAll('_', ' ').toUpperCase()}',
+                    style: const TextStyle(
                       color: Color(0xFFD97706), // Amber margin/filter
                       fontSize: 12.5,
                       fontWeight: FontWeight.bold,
@@ -624,7 +627,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         );
                       })(),
           ),
-          if (!productProvider.isLoading && productProvider.totalPages > 1 && productProvider.stockFilter == 'all')
+          if (!productProvider.isLoading && productProvider.totalPages > 1)
             _buildPagination(productProvider.totalPages, productProvider),
         ],
       ),
@@ -885,7 +888,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
       }
     }).toList();
   }
-
 
   Widget _buildFilterChip({
     required String label,
@@ -1400,6 +1402,35 @@ class _ProductsScreenState extends State<ProductsScreen> {
         child: ProductForm(product: product),
       ),
     );
+  }
+
+  void _handleExport(BuildContext context, ProductProvider provider) async {
+    final csvData = await provider.exportProducts();
+    if (csvData != null) {
+      String? savePath = await FilePicker.saveFile(
+        dialogTitle: 'Save Inventory Export',
+        fileName: 'inventory_export_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv',
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+      if (savePath != null) {
+        final file = File(savePath);
+        await file.writeAsString(csvData);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Inventory exported successfully!'),
+            backgroundColor: Color(0xFF059669),
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to export inventory.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+    }
   }
 
   void _confirmDelete(BuildContext context, Product product) {

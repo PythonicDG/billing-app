@@ -388,6 +388,29 @@ class ProductProvider with ChangeNotifier {
     return null;
   }
 
+  Future<String?> exportProducts() async {
+    try {
+      final Map<String, String> params = {
+        'search': _searchQuery,
+        'ordering': _ordering,
+      };
+      if (_stockFilter != 'all') {
+        params['stock_filter'] = _stockFilter;
+      }
+
+      final response = await _apiService.get(
+        '/api/products/export_csv/',
+        queryParams: params,
+      );
+      if (response.statusCode == 200) {
+        return response.body;
+      }
+    } catch (e) {
+      debugPrint('Error exporting products: $e');
+    }
+    return null;
+  }
+
   Future<Map<String, dynamic>?> bulkUploadProducts(Uint8List fileBytes, String fileName) async {
     try {
       final response = await _apiService.multipartRequest(

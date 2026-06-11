@@ -878,16 +878,39 @@ class _LedgerScreenState extends State<LedgerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Customer Name/Phone Panel with Actions
+          // Customer Name/Phone Panel with Actions (Card Style)
           Container(
+            margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                const BoxShadow(
+                  color: Color(0x05000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Avatar for consistent look with the list
+                CircleAvatar(
+                  backgroundColor: (calculatedOutstanding > 0) ? const Color(0xFFFEE2E2) : const Color(0xFF2563EB),
+                  radius: 24,
+                  child: Text(
+                    (_selectedLedger!['customer_name'] as String? ?? 'C').substring(0, 1).toUpperCase(),
+                    style: TextStyle(
+                      color: (calculatedOutstanding > 0) ? const Color(0xFFEF4444) : Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1090,10 +1113,14 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   )
                 : Column(
                     children: [
-                      // Header
+                      // Header Card Style
                       Container(
-                        color: const Color(0xFFF1F5F9),
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         child: Row(
                           children: const [
                             Expanded(flex: 3, child: Text('DATE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569)))),
@@ -1110,6 +1137,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       // Rows List
                       Expanded(
                         child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
                           itemCount: filteredBills.length,
                           itemBuilder: (context, index) {
                             final bill = filteredBills[index];
@@ -1166,223 +1194,238 @@ class _LedgerScreenState extends State<LedgerScreen> {
                               });
                             }
 
-                            final isAlternate = index % 2 != 0;
-
                             return Container(
-                              color: isAlternate ? const Color(0xFFF8FAFC) : Colors.white,
-                              child: Column(
-                                children: [
-                                  // Clickable Header Row
-                                  InkWell(
-                                    onTap: () {
-                                      setState(() {
-                                        _expandedInvoiceNumber = isExpanded ? null : bill['invoice_number'];
-                                      });
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                      child: Row(
-                                        children: [
-                                          Expanded(flex: 3, child: Text(dateStr, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
-                                          Expanded(flex: 3, child: Text(bill['invoice_number'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)))),
-                                          Expanded(flex: 3, child: Text(currencyFormat.format(total), style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
-                                          Expanded(flex: 3, child: Text(currencyFormat.format(paid), style: const TextStyle(fontSize: 13, color: Color(0xFF16A34A)))),
-                                          Expanded(
-                                            flex: 3,
-                                            child: Text(
-                                              currencyFormat.format(outstanding),
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 13,
-                                                color: outstanding > 0 ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
-                                              ),
-                                            ),
-                                          ),
-                                          Expanded(
-                                            flex: 2,
-                                            child: Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Container(
-                                                width: 80,
-                                                height: 24,
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(
-                                                  color: badgeBg,
-                                                  borderRadius: BorderRadius.circular(10),
-                                                ),
-                                                child: Text(
-                                                  statusLabel,
-                                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeText),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          Expanded(
-                                            flex: 2,
-                                            child: Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: GestureDetector(
-                                                onTap: () {}, // Prevents expansion/collapse of the row
-                                                child: PopupMenuButton<String>(
-                                                  icon: const Icon(Icons.visibility_outlined, size: 20, color: Color(0xFF64748B)),
-                                                  tooltip: 'Preview Invoice',
-                                                  onSelected: (value) async {
-                                                    final provider = Provider.of<BillingProvider>(context, listen: false);
-                                                    final invoiceId = bill['id'].toString();
-                                                    if (value == 'view') {
-                                                      if (context.mounted) {
-                                                        _showPdfPreviewDialog(context, invoiceId, bill['invoice_number'].toString());
-                                                      }
-                                                    } else if (value == 'download') {
-                                                      final url = await provider.getInvoicePdfUrl(invoiceId);
-                                                      if (context.mounted) _launchInvoiceUrl(context, url, inApp: false);
-                                                    } else if (value == 'print') {
-                                                      final url = await provider.getInvoicePrintHtmlUrl(invoiceId);
-                                                      if (context.mounted && url != null) {
-                                                        final printUrl = '$url&autoprint=true';
-                                                        _launchInvoiceUrl(context, printUrl, inApp: false);
-                                                      }
-                                                    } else if (value == 'delete') {
-                                                      if (context.mounted) {
-                                                        _showDeleteConfirmationDialog(context, invoiceId, bill['invoice_number'].toString());
-                                                      }
-                                                    }
-                                                  },
-                                                  itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                                                    const PopupMenuItem<String>(
-                                                      value: 'view',
-                                                      height: 36,
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
-                                                          SizedBox(width: 8),
-                                                          Text('View inside app', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    const PopupMenuItem<String>(
-                                                      value: 'download',
-                                                      height: 36,
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF64748B)),
-                                                          SizedBox(width: 8),
-                                                          Text('Download PDF', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    const PopupMenuItem<String>(
-                                                      value: 'print',
-                                                      height: 36,
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(Icons.print_outlined, size: 16, color: Color(0xFF64748B)),
-                                                          SizedBox(width: 8),
-                                                          Text('Print', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    const PopupMenuDivider(),
-                                                    const PopupMenuItem<String>(
-                                                      value: 'delete',
-                                                      height: 36,
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
-                                                          SizedBox(width: 8),
-                                                          Text('Delete Bill', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
+                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isExpanded ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  const BoxShadow(
+                                    color: Color(0x05000000),
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Column(
+                                  children: [
+                                    // Clickable Header Row
+                                    InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _expandedInvoiceNumber = isExpanded ? null : bill['invoice_number'];
+                                        });
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                        child: Row(
+                                          children: [
+                                            Expanded(flex: 3, child: Text(dateStr, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
+                                            Expanded(flex: 3, child: Text(bill['invoice_number'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)))),
+                                            Expanded(flex: 3, child: Text(currencyFormat.format(total), style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)))),
+                                            Expanded(flex: 3, child: Text(currencyFormat.format(paid), style: const TextStyle(fontSize: 13, color: Color(0xFF16A34A)))),
+                                            Expanded(
+                                              flex: 3,
+                                              child: Text(
+                                                currencyFormat.format(outstanding),
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  color: outstanding > 0 ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        ],
+                                            Expanded(
+                                              flex: 2,
+                                              child: Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: Container(
+                                                  width: 80,
+                                                  height: 24,
+                                                  alignment: Alignment.center,
+                                                  decoration: BoxDecoration(
+                                                    color: badgeBg,
+                                                    borderRadius: BorderRadius.circular(10),
+                                                  ),
+                                                  child: Text(
+                                                    statusLabel,
+                                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeText),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: GestureDetector(
+                                                  onTap: () {}, // Prevents expansion/collapse of the row
+                                                  child: PopupMenuButton<String>(
+                                                    icon: const Icon(Icons.visibility_outlined, size: 20, color: Color(0xFF64748B)),
+                                                    tooltip: 'Preview Invoice',
+                                                    onSelected: (value) async {
+                                                      final provider = Provider.of<BillingProvider>(context, listen: false);
+                                                      final invoiceId = bill['id'].toString();
+                                                      if (value == 'view') {
+                                                        if (context.mounted) {
+                                                          _showPdfPreviewDialog(context, invoiceId, bill['invoice_number'].toString());
+                                                        }
+                                                      } else if (value == 'download') {
+                                                        final url = await provider.getInvoicePdfUrl(invoiceId);
+                                                        if (context.mounted) _launchInvoiceUrl(context, url, inApp: false);
+                                                      } else if (value == 'print') {
+                                                        final url = await provider.getInvoicePrintHtmlUrl(invoiceId);
+                                                        if (context.mounted && url != null) {
+                                                          final printUrl = '$url&autoprint=true';
+                                                          _launchInvoiceUrl(context, printUrl, inApp: false);
+                                                        }
+                                                      } else if (value == 'delete') {
+                                                        if (context.mounted) {
+                                                          _showDeleteConfirmationDialog(context, invoiceId, bill['invoice_number'].toString());
+                                                        }
+                                                      }
+                                                    },
+                                                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                                      const PopupMenuItem<String>(
+                                                        value: 'view',
+                                                        height: 36,
+                                                        child: Row(
+                                                          children: [
+                                                            Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
+                                                            SizedBox(width: 8),
+                                                            Text('View inside app', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const PopupMenuItem<String>(
+                                                        value: 'download',
+                                                        height: 36,
+                                                        child: Row(
+                                                          children: [
+                                                            Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF64748B)),
+                                                            SizedBox(width: 8),
+                                                            Text('Download PDF', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const PopupMenuItem<String>(
+                                                        value: 'print',
+                                                        height: 36,
+                                                        child: Row(
+                                                          children: [
+                                                            Icon(Icons.print_outlined, size: 16, color: Color(0xFF64748B)),
+                                                            SizedBox(width: 8),
+                                                            Text('Print', style: TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const PopupMenuDivider(),
+                                                      const PopupMenuItem<String>(
+                                                        value: 'delete',
+                                                        height: 36,
+                                                        child: Row(
+                                                          children: [
+                                                            Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
+                                                            SizedBox(width: 8),
+                                                            Text('Delete Bill', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  
-                                  // Inline Expanded Payment History & Action Panel
-                                  if (isExpanded)
-                                    Container(
-                                      padding: const EdgeInsets.all(16),
-                                      color: const Color(0xFFF1F5F9).withOpacity(0.5),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              const Text(
-                                                'PAYMENT HISTORY',
-                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
-                                              ),
-                                              if (outstanding > 0)
-                                                ElevatedButton.icon(
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: const Color(0xFF0F2C59),
-                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                                  ),
-                                                  onPressed: () => _showRecordPaymentDialog(bill),
-                                                  icon: const Icon(Icons.add, size: 14, color: Colors.white),
-                                                  label: const Text(
-                                                    'Add Payment',
-                                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          if (unifiedPayments.isEmpty)
-                                            const Padding(
-                                              padding: EdgeInsets.symmetric(vertical: 8.0),
-                                              child: Text('No payments recorded for this invoice.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                                            )
-                                          else
-                                            Table(
-                                              border: TableBorder.all(color: const Color(0xFFE2E8F0), width: 1, borderRadius: BorderRadius.circular(6)),
-                                              columnWidths: const {
-                                                0: FlexColumnWidth(3),
-                                                1: FlexColumnWidth(3),
-                                                2: FlexColumnWidth(2),
-                                                3: FlexColumnWidth(4),
-                                              },
+                                    
+                                    // Inline Expanded Payment History & Action Panel
+                                    if (isExpanded)
+                                      Container(
+                                        padding: const EdgeInsets.all(16),
+                                        color: const Color(0xFFF1F5F9).withOpacity(0.5),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
-                                                TableRow(
-                                                  decoration: const BoxDecoration(color: Color(0xFFE2E8F0)),
-                                                  children: const [
-                                                    Padding(padding: EdgeInsets.all(8.0), child: Text('DATE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
-                                                    Padding(padding: EdgeInsets.all(8.0), child: Text('AMOUNT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
-                                                    Padding(padding: EdgeInsets.all(8.0), child: Text('MODE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
-                                                    Padding(padding: EdgeInsets.all(8.0), child: Text('NOTES', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
-                                                  ],
+                                                const Text(
+                                                  'PAYMENT HISTORY',
+                                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
                                                 ),
-                                                ...unifiedPayments.map((p) {
-                                                  final paymentDateRaw = p['payment_date'];
-                                                   final paymentDateTime = paymentDateRaw != null
-                                                      ? (DateTime.tryParse(paymentDateRaw.toString())?.toLocal() ?? DateTime.now())
-                                                      : DateTime.now();
-                                                  final pDateStr = DateFormat('dd MMM yyyy HH:mm').format(paymentDateTime);
-                                                  final pAmt = double.tryParse(p['amount'].toString()) ?? 0.0;
-                                                  return TableRow(
-                                                    children: [
-                                                      Padding(padding: const EdgeInsets.all(8.0), child: Text(pDateStr, style: const TextStyle(fontSize: 11))),
-                                                      Padding(padding: const EdgeInsets.all(8.0), child: Text(currencyFormat.format(pAmt), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)))),
-                                                      Padding(padding: const EdgeInsets.all(8.0), child: Text(p['mode'].toString(), style: const TextStyle(fontSize: 11))),
-                                                      Padding(padding: const EdgeInsets.all(8.0), child: Text(p['notes'].toString(), style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
-                                                    ],
-                                                  );
-                                                })
+                                                if (outstanding > 0)
+                                                  ElevatedButton.icon(
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: const Color(0xFF0F2C59),
+                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                    ),
+                                                    onPressed: () => _showRecordPaymentDialog(bill),
+                                                    icon: const Icon(Icons.add, size: 14, color: Colors.white),
+                                                    label: const Text(
+                                                      'Add Payment',
+                                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                                    ),
+                                                  ),
                                               ],
                                             ),
-                                        ],
+                                            const SizedBox(height: 8),
+                                            if (unifiedPayments.isEmpty)
+                                              const Padding(
+                                                padding: EdgeInsets.symmetric(vertical: 8.0),
+                                                child: Text('No payments recorded for this invoice.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                              )
+                                            else
+                                              Table(
+                                                border: TableBorder.all(color: const Color(0xFFE2E8F0), width: 1, borderRadius: BorderRadius.circular(6)),
+                                                columnWidths: const {
+                                                  0: FlexColumnWidth(3),
+                                                  1: FlexColumnWidth(3),
+                                                  2: FlexColumnWidth(2),
+                                                  3: FlexColumnWidth(4),
+                                                },
+                                                children: [
+                                                  TableRow(
+                                                    decoration: const BoxDecoration(color: Color(0xFFE2E8F0)),
+                                                    children: const [
+                                                      Padding(padding: EdgeInsets.all(8.0), child: Text('DATE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                                      Padding(padding: EdgeInsets.all(8.0), child: Text('AMOUNT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                                      Padding(padding: EdgeInsets.all(8.0), child: Text('MODE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                                      Padding(padding: EdgeInsets.all(8.0), child: Text('NOTES', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                                                    ],
+                                                  ),
+                                                  ...unifiedPayments.map((p) {
+                                                    final paymentDateRaw = p['payment_date'];
+                                                     final paymentDateTime = paymentDateRaw != null
+                                                        ? (DateTime.tryParse(paymentDateRaw.toString())?.toLocal() ?? DateTime.now())
+                                                        : DateTime.now();
+                                                    final pDateStr = DateFormat('dd MMM yyyy HH:mm').format(paymentDateTime);
+                                                    final pAmt = double.tryParse(p['amount'].toString()) ?? 0.0;
+                                                    return TableRow(
+                                                      children: [
+                                                        Padding(padding: const EdgeInsets.all(8.0), child: Text(pDateStr, style: const TextStyle(fontSize: 11))),
+                                                        Padding(padding: const EdgeInsets.all(8.0), child: Text(currencyFormat.format(pAmt), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)))),
+                                                        Padding(padding: const EdgeInsets.all(8.0), child: Text(p['mode'].toString(), style: const TextStyle(fontSize: 11))),
+                                                        Padding(padding: const EdgeInsets.all(8.0), child: Text(p['notes'].toString(), style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
+                                                      ],
+                                                    );
+                                                  })
+                                                ],
+                                              ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  const Divider(height: 1),
-                                ],
+                                  ],
+                                ),
                               ),
                             );
                           },
@@ -1414,17 +1457,53 @@ class _LedgerScreenState extends State<LedgerScreen> {
       ),
       drawer: const AppDrawer(),
       body: isWide
-          ? Row(
-              children: [
-                SizedBox(
-                  width: 320,
-                  child: _buildCustomerList(),
-                ),
-                const VerticalDivider(width: 1, color: Color(0xFFE2E8F0)),
-                Expanded(
-                  child: _buildLedgerDetail(),
-                ),
-              ],
+          ? Container(
+              color: const Color(0xFFF1F5F9),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 320,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: _buildCustomerList(),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: _buildLedgerDetail(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             )
           : _selectedCustomer == null
               ? _buildCustomerList()

@@ -7,14 +7,12 @@ import 'auth_provider.dart';
 import 'product_provider.dart';
 import 'billing_provider.dart';
 import 'dashboard_provider.dart';
-import 'report_provider.dart';
 import 'theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/products_screen.dart';
 import 'screens/billing_screen.dart';
 import 'screens/ledger_screen.dart';
-import 'screens/report_screen.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -33,7 +31,6 @@ void main() {
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => BillingProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
-        ChangeNotifierProvider(create: (_) => ReportProvider()),
       ],
       child: const VighnahartaApp(),
     ),
@@ -81,7 +78,6 @@ class _VighnahartaAppState extends State<VighnahartaApp> {
           '/inventory': (context) => const ProductsScreen(),
           '/billing': (context) => const BillingScreen(),
           '/ledger': (context) => const LedgerScreen(),
-          '/reports': (context) => const ReportScreen(),
         },
       ),
     );

@@ -79,6 +79,7 @@ class Product {
 class ProductProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   List<Product> _products = [];
+  List<Product> _frequentProducts = [];
   List<Category> _categoriesList = [];
   String? _nextUrl;
   String? _previousUrl;
@@ -91,6 +92,7 @@ class ProductProvider with ChangeNotifier {
   int _totalCount = 0;
 
   List<Product> get products => _products;
+  List<Product> get frequentProducts => _frequentProducts;
   List<Category> get categoriesList => _categoriesList;
   bool get isLoading => _isLoading;
   bool get hasNext => _nextUrl != null;
@@ -109,6 +111,19 @@ class ProductProvider with ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error fetching categories: $e');
+    }
+  }
+
+  Future<void> fetchFrequentProducts() async {
+    try {
+      final response = await _apiService.get(ApiConstants.frequentProductsUrl);
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        _frequentProducts = data.map((p) => Product.fromJson(p)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error fetching frequent products: $e');
     }
   }
 

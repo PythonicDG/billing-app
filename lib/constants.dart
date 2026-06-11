@@ -2,6 +2,7 @@ class ApiConstants {
   static const String baseUrl = 'http://127.0.0.1:8000'; // Local URL
   static const String loginUrl = '/api/login/';
   static const String productsUrl = '/api/products/';
+  static const String frequentProductsUrl = '/api/products/frequent/';
   static const String staffListUrl = '/api/staff/list/';
   static const String staffCreateUrl = '/api/staff/create/';
   static const String invoicesUrl = '/api/billing/invoices/';

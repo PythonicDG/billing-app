@@ -49,6 +49,7 @@ class _BillingScreenState extends State<BillingScreen> {
       final productProvider = Provider.of<ProductProvider>(context, listen: false);
       productProvider.fetchProducts(pageSize: 100);
       productProvider.fetchCategories();
+      productProvider.fetchFrequentProducts();
     });
   }
 
@@ -374,6 +375,8 @@ class _BillingScreenState extends State<BillingScreen> {
           ),
         ),
 
+        // Frequently Bought Items
+        _buildFrequentItemsRow(productProvider, billingProvider),
 
         // Products Grid
         Expanded(
@@ -679,6 +682,171 @@ class _BillingScreenState extends State<BillingScreen> {
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildFrequentItemsRow(ProductProvider productProvider, BillingProvider billingProvider) {
+    if (productProvider.frequentProducts.isEmpty) return const SizedBox.shrink();
+
+    // Limit to top 5 items
+    final frequentItems = productProvider.frequentProducts.take(5).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              Icon(Icons.auto_awesome, color: Color(0xFFD97706), size: 16),
+              SizedBox(width: 8),
+              Text(
+                'TOP 5 FREQUENTLY BOUGHT',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.8,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: frequentItems.map((product) {
+              final isInCart = billingProvider.cart.any((item) => item.product.uuid == product.uuid);
+              final cartItem = isInCart ? billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid) : null;
+              
+              final selectedUnit = isInCart ? cartItem!.unit : (_tempUnits[product.uuid] ?? 'PIECE');
+              final currentPrice = selectedUnit == 'CENT' ? product.sellingPrice * 10 : product.sellingPrice;
+
+              return Expanded(
+                child: Container(
+                  height: 132,
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isInCart ? const Color(0xFFEFF6FF) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isInCart ? const Color(0xFF2563EB).withOpacity(0.5) : const Color(0xFFE2E8F0),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.name,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isInCart ? const Color(0xFF2563EB) : const Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        product.brand,
+                        style: const TextStyle(fontSize: 8.5, color: Color(0xFF64748B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      
+                      // Unit Toggle
+                      _buildUnitToggle(
+                        currentUnit: selectedUnit,
+                        onToggle: (newUnit) {
+                          if (isInCart) {
+                            billingProvider.toggleUnit(product.uuid);
+                          } else {
+                            setState(() {
+                              _tempUnits[product.uuid] = newUnit;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+
+                      if (isInCart)
+                        // Quantity Controls
+                        Container(
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildQtyBtn(
+                                Icons.remove,
+                                () => billingProvider.updateQuantity(
+                                  product.uuid,
+                                  cartItem!.quantity - 1,
+                                  product.stockQuantity,
+                                ),
+                              ),
+                              Text(
+                                '${cartItem!.quantity}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF2563EB)),
+                              ),
+                              _buildQtyBtn(
+                                Icons.add,
+                                () => billingProvider.updateQuantity(
+                                  product.uuid,
+                                  cartItem.quantity + 1,
+                                  product.stockQuantity,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        // Add Button and Price
+                        InkWell(
+                          onTap: () {
+                            if (product.totalStockInCent > 0) {
+                              billingProvider.addToCart(product, unit: selectedUnit);
+                            }
+                          },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '₹${currentPrice.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF2563EB),
+                                ),
+                              ),
+                              if (product.totalStockInCent <= 0)
+                                const Text('OUT', style: TextStyle(fontSize: 8, color: Color(0xFFEF4444), fontWeight: FontWeight.bold))
+                              else
+                                const Icon(Icons.add_circle, color: Color(0xFF0F2C59), size: 24),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ],
     );
   }

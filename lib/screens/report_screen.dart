@@ -201,6 +201,7 @@ class SalesAnalyticsTab extends StatelessWidget {
     final salesOverTime = data['sales_over_time'] as List;
     final paymentSplit = data['payment_split'] as List;
     final productPerformance = data['product_performance'] as List;
+    final categoryPerformance = data['category_performance'] as List? ?? [];
 
     return RefreshIndicator(
       onRefresh: () => provider.fetchAnalytics(30),
@@ -238,8 +239,38 @@ class SalesAnalyticsTab extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 32),
+            _buildSectionHeader(title: 'Category Performance', subtitle: 'Revenue by category'),
+            const SizedBox(height: 12),
+            _buildCategoryPerformanceList(categoryPerformance, currencyFormat),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryPerformanceList(List data, NumberFormat format) {
+    if (data.isEmpty) return _buildEmptyState('No category data');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(8),
+        itemCount: data.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final item = data[index];
+          return ListTile(
+            title: Text(item['category'], style: const TextStyle(fontWeight: FontWeight.bold)),
+            trailing: Text(format.format(item['revenue']), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+          );
+        },
       ),
     );
   }
@@ -384,31 +415,58 @@ class OperationsFinanceTab extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 2,
+      childAspectRatio: 2.2,
       children: [
-        _buildClosingCard('Total Sales', format.format(snapshot['total_sales']), const Color(0xFF2563EB)),
-        _buildClosingCard('New Credit', format.format(snapshot['new_credit']), const Color(0xFFDC2626)),
-        _buildClosingCard('Cash In Hand', format.format(snapshot['cash_received']), const Color(0xFF16A34A)),
-        _buildClosingCard('UPI Received', format.format(snapshot['upi_received']), const Color(0xFF0891B2)),
+        _buildClosingCard('Total Sales', format.format(snapshot['total_sales']), const Color(0xFF2563EB), Icons.trending_up),
+        _buildClosingCard('Est. Profit', format.format(snapshot['total_profit'] ?? 0), const Color(0xFF7C3AED), Icons.account_balance),
+        _buildClosingCard('Cash Received', format.format(snapshot['cash_received']), const Color(0xFF16A34A), Icons.payments_outlined),
+        _buildClosingCard('UPI Received', format.format(snapshot['upi_received']), const Color(0xFF0891B2), Icons.qr_code_scanner),
+        _buildClosingCard('New Credit', format.format(snapshot['new_credit']), const Color(0xFFDC2626), Icons.money_off),
+        _buildClosingCard('Bills Today', '${snapshot['bill_count'] ?? 0}', const Color(0xFFF59E0B), Icons.receipt_long),
       ],
     );
   }
 
-  Widget _buildClosingCard(String label, String value, Color color) {
+  Widget _buildClosingCard(String label, String value, Color color, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

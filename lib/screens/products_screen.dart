@@ -58,7 +58,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
-            blurRadius: 6,
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
@@ -83,9 +83,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 9,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF94A3B8),
+                    color: Color(0xFF64748B),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -93,7 +93,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: valueColor,
                   ),
@@ -181,6 +181,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     const isOwner = true;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
         title: const Row(
           children: [
@@ -235,92 +236,97 @@ class _ProductsScreenState extends State<ProductsScreen> {
         backgroundColor: Colors.transparent,
       ),
       drawer: const AppDrawer(),
-      body: Column(
-        children: [
-          // Elegant Search Bar with Inline Add Action
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      style: const TextStyle(fontSize: 14.5, color: Color(0xFF0F172A)),
-                      decoration: InputDecoration(
-                        hintText: 'Search by product name or brand...',
-                        prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFF2563EB)),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear_outlined, size: 20, color: Color(0xFF64748B)),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  productProvider.setSearch('');
-                                },
-                              )
-                            : null,
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        if (_debounce?.isActive ?? false) _debounce!.cancel();
-                        _debounce = Timer(const Duration(milliseconds: 250), () {
-                          productProvider.setSearch(value);
-                        });
-                      },
-                      onSubmitted: (value) {
-                        if (_debounce?.isActive ?? false) _debounce!.cancel();
-                        productProvider.setSearch(value);
-                      },
-                    ),
-                  ),
-                ),
-                if (isOwner) ...[
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    height: 52,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        foregroundColor: Colors.white,
-                        elevation: 2,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      onPressed: () => _showProductForm(context),
-                      icon: const Icon(Icons.add, color: Colors.white, size: 20),
-                      label: const Text(
-                        'ADD PRODUCT',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
+          child: Column(
+            children: [
+              // Elegant Search Bar with Inline Add Action
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        style: const TextStyle(fontSize: 14.5, color: Color(0xFF0F172A)),
+                        decoration: InputDecoration(
+                          hintText: 'Search by product name or brand...',
+                          prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFF2563EB)),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_outlined, size: 20, color: Color(0xFF64748B)),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    productProvider.setSearch('');
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: const Color(0xFFF1F5F9),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                          ),
+                        ),
+                        onChanged: (value) {
+                          if (_debounce?.isActive ?? false) _debounce!.cancel();
+                          _debounce = Timer(const Duration(milliseconds: 250), () {
+                            productProvider.setSearch(value);
+                          });
+                        },
+                        onSubmitted: (value) {
+                          if (_debounce?.isActive ?? false) _debounce!.cancel();
+                          productProvider.setSearch(value);
+                        },
+                      ),
+                    ),
+                    if (isOwner) ...[
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        height: 52,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _showProductForm(context),
+                          icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                          label: const Text(
+                            'ADD PRODUCT',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
           
           _buildSummaryCards(productProvider),
 
@@ -520,12 +526,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                       child: Container(
                                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                                         decoration: BoxDecoration(
-                                                          color: const Color(0xFFEFF6FF),
-                                                          borderRadius: BorderRadius.circular(6),
+                                                          color: const Color(0xFFF1F5F9),
+                                                          borderRadius: BorderRadius.circular(10),
                                                         ),
                                                         child: Text(
                                                           product.brand.toUpperCase(),
-                                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
                                                           overflow: TextOverflow.ellipsis,
                                                         ),
                                                       ),
@@ -533,10 +539,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                   ),
                                                 ),
                                                 if (isOwner)
-                                                  DataCell(SizedBox(width: purchaseWidth, child: Text('Rs.${product.purchasePrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12)))),
-                                                DataCell(SizedBox(width: sellingWidth, child: Text('Rs.${product.sellingPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF2563EB))))),
-                                                DataCell(SizedBox(width: casesWidth, child: Text('${product.noOfCase} cs', style: const TextStyle(fontSize: 12)))),
-                                                DataCell(SizedBox(width: centCsWidth, child: Text('${product.centInPerCs} cent', style: const TextStyle(fontSize: 12)))),
+                                                  DataCell(SizedBox(width: purchaseWidth, child: Text('Rs.${product.purchasePrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12.5)))),
+                                                DataCell(SizedBox(width: sellingWidth, child: Text('Rs.${product.sellingPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB))))),
+                                                DataCell(SizedBox(width: casesWidth, child: Text('${product.noOfCase} cs', style: const TextStyle(fontSize: 12.5)))),
+                                                DataCell(SizedBox(width: centCsWidth, child: Text('${product.centInPerCs} cent', style: const TextStyle(fontSize: 12.5)))),
                                                 DataCell(
                                                   SizedBox(
                                                     width: stockWidth,
@@ -544,7 +550,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                       '${product.totalStockInCent.toStringAsFixed(1)} cent',
                                                       style: TextStyle(
                                                         fontWeight: FontWeight.bold,
-                                                        fontSize: 12,
+                                                        fontSize: 12.5,
                                                         color: isOutOfStock
                                                             ? const Color(0xFFEF4444)
                                                             : isLowStock
@@ -567,7 +573,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                               : isLowStock
                                                                   ? const Color(0xFFFFF7ED)
                                                                   : const Color(0xFFF0FDF4),
-                                                          borderRadius: BorderRadius.circular(6),
+                                                          borderRadius: BorderRadius.circular(10),
                                                         ),
                                                         child: Text(
                                                           isOutOfStock ? 'OUT OF STOCK' : isLowStock ? 'LOW STOCK' : 'IN STOCK',
@@ -633,8 +639,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
             _buildPagination(productProvider.totalPages, productProvider),
         ],
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildPagination(int totalPages, ProductProvider provider) {
     final currentPage = provider.currentPage;
@@ -919,7 +927,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       showCheckmark: false,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         side: BorderSide(
           color: isActive ? Colors.transparent : const Color(0xFFE2E8F0),
         ),

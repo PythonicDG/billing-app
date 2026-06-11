@@ -182,10 +182,11 @@ class _BillingScreenState extends State<BillingScreen> {
         SingleActivator(LogicalKeyboardKey.escape): () => _onEscPressed(),
       },
       child: Scaffold(
+        backgroundColor: const Color(0xFFF1F5F9),
         appBar: AppBar(
           title: const Row(
             children: [
-              Icon(Icons.bolt, color: Color(0xFFD97706)), // Elegant Amber gold bolt
+              Icon(Icons.bolt, color: Color(0xFF2563EB)), // Changed from Amber to Primary Blue
               SizedBox(width: 8),
               Text(
                 'Vighnaharta POS Billing',
@@ -208,21 +209,58 @@ class _BillingScreenState extends State<BillingScreen> {
         ),
         drawer: const AppDrawer(),
         body: isWidePOSLayout
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Catalog Section
-                  Expanded(
-                    flex: 62,
-                    child: _buildCatalogSection(productProvider, displayedProducts, billingProvider),
-                  ),
-                  // Persistent Cart / Checkout Section
-                  VerticalDivider(color: const Color(0xFFE2E8F0), width: 1, thickness: 1),
-                  Expanded(
-                    flex: 38,
-                    child: _buildCheckoutSection(billingProvider),
-                  ),
-                ],
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Catalog Section
+                    Expanded(
+                      flex: 62,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: _buildCatalogSection(productProvider, displayedProducts, billingProvider),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Persistent Cart / Checkout Section
+                    Expanded(
+                      flex: 38,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: _buildCheckoutSection(billingProvider),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               )
             : _buildCatalogSection(productProvider, displayedProducts, billingProvider),
         bottomNavigationBar: (!isWidePOSLayout && billingProvider.cart.isNotEmpty)
@@ -379,18 +417,18 @@ class _BillingScreenState extends State<BillingScreen> {
                             )
                           : null,
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: const Color(0xFFF1F5F9), // Slate 100 as per guide
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.2),
                       ),
                     ),
@@ -458,13 +496,15 @@ class _BillingScreenState extends State<BillingScreen> {
                         ],
                       ),
                     )
-                  : ListView.separated(
+                  : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       itemCount: paginatedProducts.length,
-                      separatorBuilder: (context, index) => const Divider(color: Color(0xFFE2E8F0), height: 1),
                       itemBuilder: (context, index) {
                         final product = paginatedProducts[index];
-                        return _buildECommerceProductCard(product, billingProvider);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _buildECommerceProductCard(product, billingProvider),
+                        );
                       },
                     ),
         ),
@@ -761,10 +801,21 @@ class _BillingScreenState extends State<BillingScreen> {
     final isOutOfStock = product.totalStockInCent <= 0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
       decoration: BoxDecoration(
-        color: isInCart ? const Color(0xFFEFF6FF) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isInCart ? const Color(0xFF2563EB).withOpacity(0.5) : const Color(0xFFE2E8F0),
+          width: isInCart ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -935,10 +986,9 @@ class _BillingScreenState extends State<BillingScreen> {
     );
   }
 
-  // Active Checkout right side POS panel / sheet
   Widget _buildCheckoutSection(BillingProvider billingProvider) {
     return Container(
-      color: const Color(0xFFF8FAFC), // Cool slate-50 background
+      color: Colors.white, // Clean white background for the panel
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1004,6 +1054,13 @@ class _BillingScreenState extends State<BillingScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.01),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Row(
                           children: [

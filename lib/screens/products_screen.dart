@@ -19,7 +19,7 @@ class ProductsScreen extends StatefulWidget {
 class _ProductsScreenState extends State<ProductsScreen> {
   final _searchController = TextEditingController();
   final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
-  String _activeOrdering = 'created_at';
+  String _activeOrdering = '-created_at';
   Timer? _debounce;
 
   @override
@@ -959,10 +959,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
               _sortTile(
                 title: 'Newest Added First',
                 icon: Icons.calendar_month_outlined,
-                active: _activeOrdering == 'created_at',
+                active: _activeOrdering == '-created_at',
                 onTap: () {
-                  setState(() => _activeOrdering = 'created_at');
-                  provider.setOrdering('created_at');
+                  setState(() => _activeOrdering = '-created_at');
+                  provider.setOrdering('-created_at');
                   Navigator.pop(context);
                 },
               ),
@@ -1408,9 +1408,29 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void _handleExport(BuildContext context, ProductProvider provider) async {
     final csvData = await provider.exportProducts();
     if (csvData != null) {
+      // Determine file name based on current filter
+      String filterType = provider.stockFilter;
+      String typeLabel;
+      switch (filterType) {
+        case 'low_stock':
+          typeLabel = 'low_stock';
+          break;
+        case 'out_of_stock':
+          typeLabel = 'out_of_stock';
+          break;
+        case 'top_sellers':
+          typeLabel = 'top_sellers';
+          break;
+        default:
+          typeLabel = 'all_products';
+      }
+
+      final String timestamp = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
+      final String fileName = 'inventory_${typeLabel}_$timestamp.csv';
+
       String? savePath = await FilePicker.saveFile(
         dialogTitle: 'Save Inventory Export',
-        fileName: 'inventory_export_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv',
+        fileName: fileName,
         type: FileType.custom,
         allowedExtensions: ['csv'],
       );

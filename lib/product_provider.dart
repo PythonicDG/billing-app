@@ -79,13 +79,15 @@ class Product {
 class ProductProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   List<Product> _products = [];
+  List<Product> _billingProducts = [];
   List<Product> _frequentProducts = [];
   List<Category> _categoriesList = [];
   String? _nextUrl;
   String? _previousUrl;
   bool _isLoading = false;
   String _searchQuery = '';
-  String _ordering = 'created_at';
+  String _billingSearchQuery = '';
+  String _ordering = '-created_at';
   String _stockFilter = 'all'; // 'all', 'low_stock', 'out_of_stock', 'top_sellers'
   int _pageSize = 12;
 
@@ -95,6 +97,7 @@ class ProductProvider with ChangeNotifier {
   Map<String, dynamic>? _inventoryAnalytics;
 
   List<Product> get products => _products;
+  List<Product> get billingProducts => _billingProducts;
   List<Product> get frequentProducts => _frequentProducts;
   List<Category> get categoriesList => _categoriesList;
   bool get isLoading => _isLoading;
@@ -142,12 +145,18 @@ class ProductProvider with ChangeNotifier {
       final response = await _apiService.get(ApiConstants.frequentProductsUrl);
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        _products = data.map((p) => Product.fromJson(p)).toList();
-        _frequentProducts = List.from(_products);
-        _totalCount = _products.length;
-        _currentPage = 1;
-        _nextUrl = null;
-        _previousUrl = null;
+        // Strictly take top 10
+        final products = data.map((p) => Product.fromJson(p)).take(10).toList();
+        _frequentProducts = products;
+        
+        // If we are currently in top_sellers filter, update the main products list too
+        if (_stockFilter == 'top_sellers') {
+          _products = products;
+          _totalCount = products.length;
+          _currentPage = 1;
+          _nextUrl = null;
+          _previousUrl = null;
+        }
         notifyListeners();
       }
     } catch (e) {
@@ -175,8 +184,6 @@ class ProductProvider with ChangeNotifier {
 
   /// Fetch a specific page from the server (server-side pagination).
   Future<void> fetchPage(int page) async {
-    if (_stockFilter == 'top_sellers') return; // Top sellers doesn't support pagination here
-
     _isLoading = true;
     notifyListeners();
 
@@ -223,10 +230,6 @@ class ProductProvider with ChangeNotifier {
   }
 
   Future<void> fetchProducts({bool initial = true, String? url, int? pageSize}) async {
-    if (_stockFilter == 'top_sellers' && url == null) {
-      return fetchFrequentProducts();
-    }
-
     _isLoading = true;
     if (initial) {
       _currentPage = 1;
@@ -279,6 +282,40 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> fetchProductsForBilling({String? search, int pageSize = 100}) async {
+    _isLoading = true;
+    if (search != null) _billingSearchQuery = search;
+    notifyListeners();
+
+    try {
+      final Map<String, String> params = {
+        'search': _billingSearchQuery,
+        'page_size': pageSize.toString(),
+        'stock_filter': 'all', // Billing should always show all products regardless of inventory filters
+      };
+
+      final response = await _apiService.get(
+        ApiConstants.productsUrl,
+        queryParams: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('results')) {
+          final results = data['results'] as List;
+          _billingProducts = results.map((p) => Product.fromJson(p)).toList();
+        } else if (data is List) {
+          _billingProducts = data.map((p) => Product.fromJson(p)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching products for billing: $e');
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
   String? get nextUrl => _nextUrl;
   String? get previousUrl => _previousUrl;
 
@@ -296,6 +333,11 @@ class ProductProvider with ChangeNotifier {
     _searchQuery = query;
     _currentPage = 1;
     fetchProducts();
+  }
+
+  void setBillingSearch(String query) {
+    _billingSearchQuery = query;
+    fetchProductsForBilling();
   }
 
   void setOrdering(String ordering) {

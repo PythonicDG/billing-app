@@ -32,7 +32,7 @@ class _BillingScreenState extends State<BillingScreen> {
 
   String _paymentMethod = 'CASH';
   String _selectedCategory = 'ALL';
-  String _activeOrdering = 'created_at';
+  String _activeOrdering = '-created_at';
   final Map<String, String> _tempUnits = {};
   
   // Pagination State
@@ -47,7 +47,7 @@ class _BillingScreenState extends State<BillingScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final productProvider = Provider.of<ProductProvider>(context, listen: false);
-      productProvider.fetchProducts(pageSize: 100);
+      productProvider.fetchProductsForBilling(pageSize: 100);
       productProvider.fetchCategories();
     });
   }
@@ -123,7 +123,7 @@ class _BillingScreenState extends State<BillingScreen> {
 
     // Apply dynamic filtering locally over loaded products
     final String searchQuery = _searchController.text.toLowerCase();
-    List<Product> displayedProducts = productProvider.products.where((p) {
+    List<Product> displayedProducts = productProvider.billingProducts.where((p) {
       return p.name.toLowerCase().contains(searchQuery);
     }).toList();
 
@@ -146,7 +146,7 @@ class _BillingScreenState extends State<BillingScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_outlined),
             tooltip: 'Refresh Inventory',
-            onPressed: () => productProvider.fetchProducts(pageSize: 100),
+            onPressed: () => productProvider.fetchProductsForBilling(pageSize: 100),
           ),
           if (!isWidePOSLayout)
             _buildCartBadgeButton(billingProvider),
@@ -318,7 +318,7 @@ class _BillingScreenState extends State<BillingScreen> {
                               icon: const Icon(Icons.clear_outlined, size: 18, color: Color(0xFF64748B)),
                               onPressed: () {
                                 _searchController.clear();
-                                productProvider.setSearch('');
+                                productProvider.setBillingSearch('');
                                 setState(() {
                                   _currentPage = 1;
                                 });
@@ -347,12 +347,12 @@ class _BillingScreenState extends State<BillingScreen> {
                        });
                        if (_debounce?.isActive ?? false) _debounce!.cancel();
                        _debounce = Timer(const Duration(milliseconds: 250), () {
-                         productProvider.setSearch(v);
+                         productProvider.setBillingSearch(v);
                        });
                      },
                      onSubmitted: (v) {
                        if (_debounce?.isActive ?? false) _debounce!.cancel();
-                       productProvider.setSearch(v);
+                       productProvider.setBillingSearch(v);
                        setState(() {
                          _currentPage = 1;
                        });
@@ -806,9 +806,31 @@ class _BillingScreenState extends State<BillingScreen> {
                               product.stockQuantity,
                             ),
                           ),
-                          Text(
-                            '${cartItem.quantity}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF2563EB)),
+                          SizedBox(
+                            width: 32,
+                            child: TextField(
+                              controller: _getQuantityController(product.uuid, cartItem.quantity),
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF2563EB)),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              onChanged: (value) {
+                                if (value.isNotEmpty) {
+                                  final newQty = int.tryParse(value);
+                                  if (newQty != null) {
+                                    billingProvider.updateQuantity(
+                                      product.uuid,
+                                      newQty,
+                                      product.stockQuantity,
+                                    );
+                                  }
+                                }
+                              },
+                            ),
                           ),
                           _buildQtyBtn(
                             Icons.add,
@@ -1600,7 +1622,7 @@ class _BillingScreenState extends State<BillingScreen> {
                 ...itemsList.map((item) {
                   // Resolve product name from model locally if possible
                   final pProvider = Provider.of<ProductProvider>(context, listen: false);
-                  final matchingProduct = pProvider.products.firstWhere(
+                  final matchingProduct = pProvider.billingProducts.firstWhere(
                     (p) => p.uuid == item['product'],
                     orElse: () => Product(uuid: '', name: 'Firecracker Item', brand: '', sellingPrice: 0, mrp: 0, purchasePrice: 0, stockQuantity: 0, minStockLevel: 0, noOfCase: 0, centInPerCs: 0, totalStockInCent: 0.0),
                   );
@@ -1776,13 +1798,13 @@ class _BillingScreenState extends State<BillingScreen> {
               _sortTile(
                 title: 'Featured / Newest first',
                 icon: Icons.star_border_outlined,
-                active: _activeOrdering == 'created_at',
+                active: _activeOrdering == '-created_at',
                 onTap: () {
                   setState(() {
-                    _activeOrdering = 'created_at';
+                    _activeOrdering = '-created_at';
                     _currentPage = 1;
                   });
-                  provider.setOrdering('created_at');
+                  provider.setOrdering('-created_at');
                   Navigator.pop(context);
                 },
               ),

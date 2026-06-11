@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1032,9 +1033,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
         String? uploadError;
         Map<String, dynamic>? uploadResult;
 
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
+        return CallbackShortcuts(
+          bindings: {
+            SingleActivator(LogicalKeyboardKey.escape): () {
+              Navigator.pop(context);
+            },
+          },
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: const Row(
                 children: [
@@ -1254,131 +1261,139 @@ class _ProductsScreenState extends State<ProductsScreen> {
               ],
             );
           },
-        );
+        ),
+      );
+    },
+  );
+}
+
+void _showRestockDialog(BuildContext context, Product product) {
+  final _formKey = GlobalKey<FormState>();
+  int additionalCases = 0;
+  bool isSubmitting = false;
+
+  showDialog(
+    context: context,
+    builder: (context) => CallbackShortcuts(
+      bindings: {
+        SingleActivator(LogicalKeyboardKey.escape): () {
+          Navigator.pop(context);
+        },
       },
-    );
-  }
-
-  void _showRestockDialog(BuildContext context, Product product) {
-    final _formKey = GlobalKey<FormState>();
-    int additionalCases = 0;
-    bool isSubmitting = false;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
+      child: StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              const Icon(Icons.add_business_outlined, color: Color(0xFF059669)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Restock: ${product.name}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
-                ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.add_business_outlined, color: Color(0xFF059669)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Restock: ${product.name}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
-          ),
-          content: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildRestockInfoRow('Current Cases', '${product.noOfCase} cs'),
-                      const SizedBox(height: 4),
-                      _buildRestockInfoRow('Total Stock', '${product.totalStockInCent.toStringAsFixed(1)} cent'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  decoration: InputDecoration(
-                    labelText: 'Additional Cases to Add',
-                    hintText: 'e.g. 5',
-                    prefixIcon: const Icon(Icons.inventory_2_outlined),
-                    suffixText: 'cs',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  keyboardType: TextInputType.number,
-                  autofocus: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Enter quantity';
-                    final n = int.tryParse(value);
-                    if (n == null || n < 0) return 'Enter a valid positive number';
-                    return null;
-                  },
-                  onSaved: (value) => additionalCases = int.parse(value!),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              onPressed: isSubmitting
-                  ? null
-                  : () async {
-                      if (_formKey.currentState!.validate()) {
-                        _formKey.currentState!.save();
-                        setDialogState(() => isSubmitting = true);
-
-                        final provider = Provider.of<ProductProvider>(context, listen: false);
-                        final success = await provider.updateProduct(product.uuid, {
-                          'no_of_case': product.noOfCase + additionalCases,
-                        });
-
-                        if (success) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${product.name} restocked by $additionalCases cases!'),
-                              backgroundColor: const Color(0xFF059669),
-                            ),
-                          );
-                        } else {
-                          setDialogState(() => isSubmitting = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to update stock. Please try again.'),
-                              backgroundColor: Color(0xFFEF4444),
-                            ),
-                          );
-                        }
-                      }
-                    },
-              child: isSubmitting
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('CONFIRM RESTOCK', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
+        content: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    _buildRestockInfoRow('Current Cases', '${product.noOfCase} cs'),
+                    const SizedBox(height: 4),
+                    _buildRestockInfoRow('Total Stock', '${product.totalStockInCent.toStringAsFixed(1)} cent'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                decoration: InputDecoration(
+                  labelText: 'Additional Cases to Add',
+                  hintText: 'e.g. 5',
+                  prefixIcon: const Icon(Icons.inventory_2_outlined),
+                  suffixText: 'cs',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Enter quantity';
+                  final n = int.tryParse(value);
+                  if (n == null || n < 0) return 'Enter a valid positive number';
+                  return null;
+                },
+                onSaved: (value) => additionalCases = int.parse(value!),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: isSubmitting ? null : () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            onPressed: isSubmitting
+                ? null
+                : () async {
+                    if (_formKey.currentState!.validate()) {
+                      _formKey.currentState!.save();
+                      setDialogState(() => isSubmitting = true);
+
+                      final provider = Provider.of<ProductProvider>(context, listen: false);
+                      final success = await provider.updateProduct(product.uuid, {
+                        'no_of_case': product.noOfCase + additionalCases,
+                      });
+
+                      if (success) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${product.name} restocked by $additionalCases cases!'),
+                            backgroundColor: const Color(0xFF059669),
+                          ),
+                        );
+                      } else {
+                        setDialogState(() => isSubmitting = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Failed to update stock. Please try again.'),
+                            backgroundColor: Color(0xFFEF4444),
+                          ),
+                        );
+                      }
+                    }
+                  },
+            child: isSubmitting
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('CONFIRM RESTOCK', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildRestockInfoRow(String label, String value) {
     return Row(
@@ -1457,46 +1472,53 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void _confirmDelete(BuildContext context, Product product) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_outlined, color: Color(0xFFEF4444)),
-            SizedBox(width: 8),
-            Text('Delete Product', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: RichText(
-          text: TextSpan(
-            style: const TextStyle(color: Color(0xFF475569), fontSize: 14.5),
+      builder: (context) => CallbackShortcuts(
+        bindings: {
+          SingleActivator(LogicalKeyboardKey.escape): () {
+            Navigator.pop(context);
+          },
+        },
+        child: AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
             children: [
-              const TextSpan(text: 'Are you sure you want to permanently delete '),
-              TextSpan(
-                text: product.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-              ),
-              const TextSpan(text: '? This action cannot be undone.'),
+              Icon(Icons.warning_amber_outlined, color: Color(0xFFEF4444)),
+              SizedBox(width: 8),
+              Text('Delete Product', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          content: RichText(
+            text: TextSpan(
+              style: const TextStyle(color: Color(0xFF475569), fontSize: 14.5),
+              children: [
+                const TextSpan(text: 'Are you sure you want to permanently delete '),
+                TextSpan(
+                  text: product.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                ),
+                const TextSpan(text: '? This action cannot be undone.'),
+              ],
             ),
-            onPressed: () {
-              Provider.of<ProductProvider>(context, listen: false).deleteProduct(product.uuid);
-              Navigator.pop(context);
-            },
-            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              onPressed: () {
+                Provider.of<ProductProvider>(context, listen: false).deleteProduct(product.uuid);
+                Navigator.pop(context);
+              },
+              child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       ),
     );
   }

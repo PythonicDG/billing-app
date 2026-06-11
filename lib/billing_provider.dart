@@ -44,7 +44,7 @@ class InvoiceItem {
     required this.product,
     required this.quantity,
     required this.unitPrice,
-    this.unit = 'PIECE',
+    this.unit = 'CENT',
   });
 
   double get totalPrice => quantity * unitPrice;
@@ -70,7 +70,7 @@ class BillingProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  void addToCart(Product product, {String unit = 'PIECE'}) {
+  void addToCart(Product product, {String unit = 'CENT'}) {
     final existingIndex = _cart.indexWhere((item) => item.product.uuid == product.uuid);
     if (existingIndex != -1) {
       final item = _cart[existingIndex];

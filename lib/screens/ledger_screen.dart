@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -108,11 +109,17 @@ class _LedgerScreenState extends State<LedgerScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            const buttonText = 'RECORD';
+        return CallbackShortcuts(
+          bindings: {
+            SingleActivator(LogicalKeyboardKey.escape): () {
+              Navigator.pop(context);
+            },
+          },
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              const buttonText = 'RECORD';
 
-            return AlertDialog(
+              return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               title: Row(
                 children: [
@@ -269,10 +276,11 @@ class _LedgerScreenState extends State<LedgerScreen> {
               ],
             );
           },
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildCustomerList() {
     // 1. Filter
@@ -1087,9 +1095,15 @@ class _LedgerScreenState extends State<LedgerScreen> {
       context: context,
       builder: (context) {
         final billingProvider = Provider.of<BillingProvider>(context, listen: false);
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Container(
+        return CallbackShortcuts(
+          bindings: {
+            SingleActivator(LogicalKeyboardKey.escape): () {
+              Navigator.pop(context);
+            },
+          },
+          child: Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Container(
             width: 900,
             height: 700,
             padding: const EdgeInsets.all(16),
@@ -1145,16 +1159,23 @@ class _LedgerScreenState extends State<LedgerScreen> {
               ],
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
-  void _showDeleteConfirmationDialog(BuildContext context, String invoiceId, String invoiceNumber) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
+void _showDeleteConfirmationDialog(BuildContext context, String invoiceId, String invoiceNumber) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return CallbackShortcuts(
+        bindings: {
+          SingleActivator(LogicalKeyboardKey.escape): () {
+            Navigator.pop(context);
+          },
+        },
+        child: AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           title: Row(
             children: [
@@ -1204,8 +1225,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
               child: const Text('DELETE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }

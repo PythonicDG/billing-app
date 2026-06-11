@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
@@ -22,10 +23,18 @@ class _BillingScreenState extends State<BillingScreen> {
   final _customerPhoneController = TextEditingController();
   final _paidAmountController = TextEditingController();
   final _searchController = TextEditingController();
+  
+  // Focus Nodes for Keyboard Navigation
+  final FocusNode _searchFocusNode = FocusNode();
+  final FocusNode _customerNameFocusNode = FocusNode();
+  final FocusNode _customerPhoneFocusNode = FocusNode();
+
   Timer? _debounce;
 
   // Map to hold controllers for each in-cart product quantity textfield to avoid focus/cursor jump
   final Map<String, TextEditingController> _qtyControllers = {};
+  // Map to hold focus nodes for quantity fields to allow auto-focusing on add
+  final Map<String, FocusNode> _qtyFocusNodes = {};
 
   // Map to hold controllers for each in-cart product price textfield to avoid focus/cursor jump
   final Map<String, TextEditingController> _priceControllers = {};
@@ -49,17 +58,24 @@ class _BillingScreenState extends State<BillingScreen> {
       final productProvider = Provider.of<ProductProvider>(context, listen: false);
       productProvider.fetchProductsForBilling(pageSize: 100);
       productProvider.fetchCategories();
+      // Auto-focus search on start
+      _searchFocusNode.requestFocus();
     });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
-    // Correctly dispose of all dynamically created quantity controllers
+    // Correctly dispose of all dynamically created quantity controllers and focus nodes
     for (var controller in _qtyControllers.values) {
       controller.dispose();
     }
     _qtyControllers.clear();
+    
+    for (var node in _qtyFocusNodes.values) {
+      node.dispose();
+    }
+    _qtyFocusNodes.clear();
 
     // Correctly dispose of all dynamically created price controllers
     for (var controller in _priceControllers.values) {
@@ -71,7 +87,35 @@ class _BillingScreenState extends State<BillingScreen> {
     _customerPhoneController.dispose();
     _paidAmountController.dispose();
     _searchController.dispose();
+    
+    _searchFocusNode.dispose();
+    _customerNameFocusNode.dispose();
+    _customerPhoneFocusNode.dispose();
     super.dispose();
+  }
+
+  // Helper to get or create focus node for quantity
+  FocusNode _getQtyFocusNode(String uuid) {
+    return _qtyFocusNodes.putIfAbsent(uuid, () => FocusNode());
+  }
+
+  // Keyboard Shortcut Actions
+  void _onF1Pressed() {
+    _searchFocusNode.requestFocus();
+    _searchController.selection = TextSelection(baseOffset: 0, extentOffset: _searchController.text.length);
+  }
+
+  void _onF2Pressed(BillingProvider provider) {
+    _showCheckoutWizard(context, provider);
+  }
+
+  void _onEscPressed() {
+    if (_searchFocusNode.hasFocus) {
+      _searchController.clear();
+      Provider.of<ProductProvider>(context, listen: false).setBillingSearch('');
+    } else {
+      _searchFocusNode.requestFocus();
+    }
   }
 
   // Parses name and classifies into categories
@@ -130,53 +174,61 @@ class _BillingScreenState extends State<BillingScreen> {
     double screenWidth = MediaQuery.of(context).size.width;
     bool isWidePOSLayout = screenWidth >= 1024;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.bolt, color: Color(0xFFD97706)), // Elegant Amber gold bolt
-            SizedBox(width: 8),
-            Text(
-              'Vighnaharta POS Billing',
-              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A)),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_outlined),
-            tooltip: 'Refresh Inventory',
-            onPressed: () => productProvider.fetchProductsForBilling(pageSize: 100),
+    return CallbackShortcuts(
+      bindings: {
+        SingleActivator(LogicalKeyboardKey.keyF, control: true): () => _onF1Pressed(), // Ctrl+F Search
+        SingleActivator(LogicalKeyboardKey.keyB, control: true): () => _onF2Pressed(billingProvider), // Ctrl+B Checkout
+        SingleActivator(LogicalKeyboardKey.keyR, control: true): () => productProvider.fetchProductsForBilling(pageSize: 100), // Ctrl+R Refresh
+        SingleActivator(LogicalKeyboardKey.escape): () => _onEscPressed(),
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Row(
+            children: [
+              Icon(Icons.bolt, color: Color(0xFFD97706)), // Elegant Amber gold bolt
+              SizedBox(width: 8),
+              Text(
+                'Vighnaharta POS Billing',
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A)),
+              ),
+            ],
           ),
-          if (!isWidePOSLayout)
-            _buildCartBadgeButton(billingProvider),
-          const SizedBox(width: 8),
-        ],
-        elevation: 0,
-        backgroundColor: Colors.transparent,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_outlined),
+              tooltip: 'Refresh Inventory (Ctrl+R)',
+              onPressed: () => productProvider.fetchProductsForBilling(pageSize: 100),
+            ),
+            if (!isWidePOSLayout)
+              _buildCartBadgeButton(billingProvider),
+            const SizedBox(width: 8),
+          ],
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+        ),
+        drawer: const AppDrawer(),
+        body: isWidePOSLayout
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Catalog Section
+                  Expanded(
+                    flex: 62,
+                    child: _buildCatalogSection(productProvider, displayedProducts, billingProvider),
+                  ),
+                  // Persistent Cart / Checkout Section
+                  VerticalDivider(color: const Color(0xFFE2E8F0), width: 1, thickness: 1),
+                  Expanded(
+                    flex: 38,
+                    child: _buildCheckoutSection(billingProvider),
+                  ),
+                ],
+              )
+            : _buildCatalogSection(productProvider, displayedProducts, billingProvider),
+        bottomNavigationBar: (!isWidePOSLayout && billingProvider.cart.isNotEmpty)
+            ? _buildMobileFloatingCartBar(billingProvider)
+            : null,
       ),
-      drawer: const AppDrawer(),
-      body: isWidePOSLayout
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Catalog Section
-                Expanded(
-                  flex: 62,
-                  child: _buildCatalogSection(productProvider, displayedProducts, billingProvider),
-                ),
-                // Persistent Cart / Checkout Section
-                VerticalDivider(color: const Color(0xFFE2E8F0), width: 1, thickness: 1),
-                Expanded(
-                  flex: 38,
-                  child: _buildCheckoutSection(billingProvider),
-                ),
-              ],
-            )
-          : _buildCatalogSection(productProvider, displayedProducts, billingProvider),
-      bottomNavigationBar: (!isWidePOSLayout && billingProvider.cart.isNotEmpty)
-          ? _buildMobileFloatingCartBar(billingProvider)
-          : null,
     );
   }
 
@@ -187,7 +239,7 @@ class _BillingScreenState extends State<BillingScreen> {
       children: [
         IconButton(
           icon: const Icon(Icons.shopping_bag_outlined),
-          tooltip: 'Active Cart',
+          tooltip: 'Active Cart (Ctrl+B)',
           onPressed: () => _showMobileCartBottomSheet(context, billingProvider),
         ),
         if (billingProvider.cart.isNotEmpty)
@@ -255,7 +307,7 @@ class _BillingScreenState extends State<BillingScreen> {
               onPressed: () => _showMobileCartBottomSheet(context, billingProvider),
               icon: const Icon(Icons.shopping_cart_checkout_outlined, size: 18),
               label: const Text(
-                'CHECKOUT',
+                'CHECKOUT (Ctrl+B)',
                 style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
               ),
             ),
@@ -309,9 +361,10 @@ class _BillingScreenState extends State<BillingScreen> {
                   ),
                   child: TextField(
                     controller: _searchController,
+                    focusNode: _searchFocusNode,
                     style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                     decoration: InputDecoration(
-                      hintText: 'Quick find firecrackers...',
+                      hintText: 'Quick find firecrackers... (Ctrl+F)',
                       prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFF2563EB), size: 20),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
@@ -356,6 +409,18 @@ class _BillingScreenState extends State<BillingScreen> {
                        setState(() {
                          _currentPage = 1;
                        });
+                       
+                       // KEYBOARD OPTIMIZATION: If results found, add the first one and focus its Qty
+                       if (paginatedProducts.isNotEmpty) {
+                         final product = paginatedProducts.first;
+                         final unit = _tempUnits[product.uuid] ?? 'CENT';
+                         billingProvider.addToCart(product, unit: unit);
+                         
+                         // Auto focus the quantity field of the added item
+                         WidgetsBinding.instance.addPostFrameCallback((_) {
+                           _getQtyFocusNode(product.uuid).requestFocus();
+                         });
+                       }
                      },
                   ),
                 ),
@@ -690,7 +755,7 @@ class _BillingScreenState extends State<BillingScreen> {
     final isInCart = billingProvider.cart.any((item) => item.product.uuid == product.uuid);
     final cartItem = isInCart ? billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid) : null;
     
-    final selectedUnit = isInCart ? cartItem!.unit : (_tempUnits[product.uuid] ?? 'PIECE');
+    final selectedUnit = isInCart ? cartItem!.unit : (_tempUnits[product.uuid] ?? 'CENT');
     final currentPrice = selectedUnit == 'CENT' ? product.sellingPrice * 10 : product.sellingPrice;
     
     final isOutOfStock = product.totalStockInCent <= 0;
@@ -810,6 +875,7 @@ class _BillingScreenState extends State<BillingScreen> {
                             width: 32,
                             child: TextField(
                               controller: _getQuantityController(product.uuid, cartItem.quantity),
+                              focusNode: _getQtyFocusNode(product.uuid),
                               keyboardType: TextInputType.number,
                               textAlign: TextAlign.center,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF2563EB)),
@@ -829,6 +895,11 @@ class _BillingScreenState extends State<BillingScreen> {
                                     );
                                   }
                                 }
+                              },
+                              onSubmitted: (_) {
+                                // KEYBOARD OPTIMIZATION: On enter from quantity, jump back to search
+                                _searchFocusNode.requestFocus();
+                                _searchController.selection = TextSelection(baseOffset: 0, extentOffset: _searchController.text.length);
                               },
                             ),
                           ),
@@ -1044,7 +1115,7 @@ class _BillingScreenState extends State<BillingScreen> {
                                         ),
                                       ),
                                       Text(
-                                        ' ${item.unit == 'CENT' ? 'Cent' : 'Box'}',
+                                        ' ${item.unit == 'CENT' ? 'Cent' : 'Unit'}',
                                         style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
                                       ),
                                       const SizedBox(width: 8),
@@ -1175,8 +1246,15 @@ class _BillingScreenState extends State<BillingScreen> {
    // Interactive Payment & Checkout Wizard
   void _showCheckoutWizard(BuildContext context, BillingProvider provider) {
     _paidAmountController.text = provider.grandTotal.toString();
+    _customerNameController.clear();
+    _customerPhoneController.clear();
     _paymentMethod = 'CASH';
     double changeAmount = 0.0;
+    
+    // Auto focus customer name when wizard opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _customerNameFocusNode.requestFocus();
+    });
 
     showModalBottomSheet(
       context: context,
@@ -1192,329 +1270,389 @@ class _BillingScreenState extends State<BillingScreen> {
           changeAmount = paidVal - provider.grandTotal;
           if (changeAmount < 0) changeAmount = 0.0;
 
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 20,
-              right: 20,
-              top: 20,
-            ),
-            child: SingleChildScrollView(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 50,
-                        height: 5,
-                        decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Row(
-                      children: [
-                        Icon(Icons.payment_outlined, color: Color(0xFF2563EB)),
-                        SizedBox(width: 8),
-                        Text('Billing Checkout Portal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                      ],
-                    ),
-                    const Divider(color: Color(0xFFE2E8F0), height: 24),
-
-                    // Customer Profile
-                    const Text('CUSTOMER PROFILE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF94A3B8))),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Autocomplete<Customer>(
-                            optionsBuilder: (TextEditingValue textEditingValue) async {
-                              if (textEditingValue.text.isEmpty) {
-                                return const Iterable<Customer>.empty();
-                              }
-                              return await provider.searchCustomers(textEditingValue.text);
-                            },
-                            displayStringForOption: (Customer option) => option.name,
-                            onSelected: (Customer selection) {
-                              setModalState(() {
-                                _customerNameController.text = selection.name;
-                                _customerPhoneController.text = selection.phone;
-                              });
-                            },
-                            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                              if (controller.text != _customerNameController.text) {
-                                controller.text = _customerNameController.text;
-                              }
-                              controller.addListener(() {
-                                _customerNameController.text = controller.text;
-                              });
-                              return TextFormField(
-                                controller: controller,
-                                focusNode: focusNode,
-                                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-                                decoration: const InputDecoration(
-                                  labelText: 'Customer Name',
-                                  prefixIcon: Icon(Icons.person_outline),
-                                  filled: true,
-                                  fillColor: Color(0xFFF8FAFC),
-                                ),
-                                validator: (v) => v!.isEmpty ? 'Enter customer name' : null,
-                              );
-                            },
-                          ),
+          return RawKeyboardListener(
+            focusNode: FocusNode(), // Temporary node for local listening
+            onKey: (event) {
+              if (event is RawKeyDownEvent) {
+                if (event.logicalKey == LogicalKeyboardKey.digit1 || event.logicalKey == LogicalKeyboardKey.numpad1) {
+                  setModalState(() { _paymentMethod = 'CASH'; });
+                } else if (event.logicalKey == LogicalKeyboardKey.digit2 || event.logicalKey == LogicalKeyboardKey.numpad2) {
+                  setModalState(() { _paymentMethod = 'UPI'; });
+                }
+              }
+            },
+            child: CallbackShortcuts(
+              bindings: {
+                SingleActivator(LogicalKeyboardKey.escape): () => Navigator.pop(context),
+                SingleActivator(LogicalKeyboardKey.enter, control: true): () => _onConfirmPressed(provider), // Ctrl+Enter Confirm
+              },
+              child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20,
+                right: 20,
+                top: 20,
+              ),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 50,
+                          height: 5,
+                          decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(10)),
                         ),
-                        const SizedBox(width: 10),
-                        // Quick autocomplete walk-in client
-                        OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF2563EB)),
-                            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: () {
-                            setModalState(() {
-                              _customerNameController.text = 'Walk-In Customer';
-                              _customerPhoneController.text = '9999999999';
-                            });
-                          },
-                          child: const Text('WALK-IN', style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 11)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _customerPhoneController,
-                      keyboardType: TextInputType.phone,
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-                      decoration: const InputDecoration(
-                        labelText: 'Mobile Number',
-                        prefixIcon: Icon(Icons.phone_outlined),
-                        filled: true,
-                        fillColor: Color(0xFFF8FAFC),
                       ),
-                      onChanged: (phone) async {
-                        if (phone.length == 10) {
-                          final results = await provider.searchCustomers(phone);
-                          final exactMatch = results.firstWhere(
-                            (c) => c.phone.trim() == phone.trim(),
-                            orElse: () => Customer(id: '', name: '', phone: ''),
-                          );
-                          if (exactMatch.id.isNotEmpty) {
-                            setModalState(() {
-                              _customerNameController.text = exactMatch.name;
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Loaded existing customer: ${exactMatch.name}'),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Payment details
-                    const Text('PAYMENT DETAILS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF94A3B8))),
-                    const SizedBox(height: 10),
-                    
-                    // Segmented Payment Method Selector
-                    Container(
-                      height: 46,
-                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.all(3),
-                      child: Row(
+                      const SizedBox(height: 16),
+                      const Row(
                         children: [
-                          Expanded(child: _paymentSegment('CASH', Icons.money_outlined, _paymentMethod == 'CASH', () {
-                            setModalState(() { _paymentMethod = 'CASH'; });
-                          })),
-                          Expanded(child: _paymentSegment('UPI', Icons.qr_code_outlined, _paymentMethod == 'UPI', () {
-                            setModalState(() { _paymentMethod = 'UPI'; });
-                          })),
+                          Icon(Icons.payment_outlined, color: Color(0xFF2563EB)),
+                          SizedBox(width: 8),
+                          Text('Billing Checkout Portal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          Spacer(),
+                          Text('ESC to close', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Simulated Payment panels
-                    if (_paymentMethod == 'CASH') ...[
+                      const Divider(color: Color(0xFFE2E8F0), height: 24),
+  
+                      // Customer Profile
+                      const Text('CUSTOMER PROFILE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF94A3B8))),
+                      const SizedBox(height: 10),
                       Row(
                         children: [
                           Expanded(
-                            child: TextFormField(
-                              controller: _paidAmountController,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-                              decoration: const InputDecoration(
-                                labelText: 'Received Cash (₹)',
-                                prefixIcon: Icon(Icons.payments_outlined),
-                                filled: true,
-                                fillColor: Color(0xFFF8FAFC),
+                            child: SizedBox(
+                              height: 60,
+                              child: Autocomplete<Customer>(
+                                textEditingController: _customerNameController,
+                                focusNode: _customerNameFocusNode,
+                                optionsBuilder: (TextEditingValue textEditingValue) async {
+                                  if (textEditingValue.text.isEmpty) {
+                                    return const Iterable<Customer>.empty();
+                                  }
+                                  return await provider.searchCustomers(textEditingValue.text);
+                                },
+                                displayStringForOption: (Customer option) => option.name,
+                                onSelected: (Customer selection) {
+                                  setModalState(() {
+                                    _customerPhoneController.text = selection.phone;
+                                  });
+                                  _customerPhoneFocusNode.requestFocus();
+                                },
+                                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                                  return TextFormField(
+                                    controller: controller,
+                                    focusNode: focusNode,
+                                    style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                                    textInputAction: TextInputAction.next,
+                                    onFieldSubmitted: (_) => _customerPhoneFocusNode.requestFocus(),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Customer Name',
+                                      prefixIcon: Icon(Icons.person_outline),
+                                      filled: true,
+                                      fillColor: Color(0xFFF8FAFC),
+                                    ),
+                                    validator: (v) => v!.isEmpty ? 'Enter customer name' : null,
+                                  );
+                                },
+                                optionsViewBuilder: (context, onSelected, options) {
+                                  return Align(
+                                    alignment: Alignment.topLeft,
+                                    child: Material(
+                                      elevation: 4,
+                                      child: Container(
+                                        width: 300,
+                                        constraints: const BoxConstraints(maxHeight: 200),
+                                        child: ListView.builder(
+                                          padding: EdgeInsets.zero,
+                                          shrinkWrap: true,
+                                          itemCount: options.length,
+                                          itemBuilder: (context, index) {
+                                            final option = options.elementAt(index);
+                                            return ListTile(
+                                              title: Text(option.name),
+                                              subtitle: Text(option.phone),
+                                              onTap: () => onSelected(option),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                              onChanged: (v) {
-                                setModalState(() {});
-                              },
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF16A34A).withOpacity(0.08), // Soft emerald tint
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.3)),
+                          const SizedBox(width: 10),
+                          // Quick autocomplete walk-in client
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF2563EB)),
+                              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('RETURN CHANGE', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
-                                Text(
-                                  currencyFormat.format(changeAmount),
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
-                                ),
-                              ],
-                            ),
+                            onPressed: () {
+                              setModalState(() {
+                                _customerNameController.text = 'Walk-In Customer';
+                                _customerPhoneController.text = '9999999999';
+                              });
+                            },
+                            child: const Text('WALK-IN', style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 11)),
                           ),
                         ],
                       ),
-                    ] else if (_paymentMethod == 'UPI') ...[
-                      // Simulated UPI Scan code
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _customerPhoneController,
+                        focusNode: _customerPhoneFocusNode,
+                        keyboardType: TextInputType.phone,
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) {
+                          if (_paymentMethod == 'CASH') {
+                            _paidAmountController.selection = TextSelection(baseOffset: 0, extentOffset: _paidAmountController.text.length);
+                            // Set focus to paid amount would happen here if we had a node, but let's let standard Next handle it
+                          }
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Mobile Number',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                          filled: true,
+                          fillColor: Color(0xFFF8FAFC),
                         ),
+                        onChanged: (phone) async {
+                          if (phone.length == 10) {
+                            final results = await provider.searchCustomers(phone);
+                            final exactMatch = results.firstWhere(
+                              (c) => c.phone.trim() == phone.trim(),
+                              orElse: () => Customer(id: '', name: '', phone: ''),
+                            );
+                            if (exactMatch.id.isNotEmpty) {
+                              setModalState(() {
+                                _customerNameController.text = exactMatch.name;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Loaded existing customer: ${exactMatch.name}'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 20),
+  
+                      // Payment details
+                      const Text('PAYMENT DETAILS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF94A3B8))),
+                      const SizedBox(height: 10),
+                      
+                      // Segmented Payment Method Selector
+                      Container(
+                        height: 46,
+                        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.all(3),
                         child: Row(
                           children: [
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: const Icon(Icons.qr_code_2_outlined, color: Color(0xFF0F172A), size: 50),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('UPI INSTANT QR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Instruct client to scan the active POS scanner screen or billing desk card.',
-                                    style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
-                                  ),
-                                ],
-                              ),
-                            )
+                            Expanded(child: _paymentSegment('CASH (1)', Icons.money_outlined, _paymentMethod == 'CASH', () {
+                              setModalState(() { _paymentMethod = 'CASH'; });
+                            })),
+                            Expanded(child: _paymentSegment('UPI (2)', Icons.qr_code_outlined, _paymentMethod == 'UPI', () {
+                              setModalState(() { _paymentMethod = 'UPI'; });
+                            })),
                           ],
                         ),
                       ),
-                    ],
-
-                    const SizedBox(height: 24),
-                    const Divider(color: Color(0xFFE2E8F0)),
-
-                    // Net Pay and Actions
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: 16),
+  
+                      // Simulated Payment panels
+                      if (_paymentMethod == 'CASH') ...[
+                        Row(
                           children: [
-                            const Text('NET TO COLLECT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
-                            Text(currencyFormat.format(provider.grandTotal), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _paidAmountController,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                                decoration: const InputDecoration(
+                                  labelText: 'Received Cash (₹)',
+                                  prefixIcon: Icon(Icons.payments_outlined),
+                                  filled: true,
+                                  fillColor: Color(0xFFF8FAFC),
+                                ),
+                                onFieldSubmitted: (_) {
+                                  // Trigger confirm on Enter in cash field
+                                  _onConfirmPressed(provider);
+                                },
+                                onChanged: (v) {
+                                  setModalState(() {});
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF16A34A).withOpacity(0.08), // Soft emerald tint
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.3)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('RETURN CHANGE', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+                                  Text(
+                                    currencyFormat.format(changeAmount),
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                        if (provider.isLoading)
-                          const CircularProgressIndicator(color: Color(0xFF2563EB))
-                        else
-                          Row(
+                      ] else if (_paymentMethod == 'UPI') ...[
+                        // Simulated UPI Scan code
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
                             children: [
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
                                 ),
-                                onPressed: () async {
-                                  if (_formKey.currentState!.validate()) {
-                                    final preview = await provider.previewInvoice(
-                                      customerName: _customerNameController.text,
-                                      customerPhone: _customerPhoneController.text,
-                                      paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
-                                      paymentMethod: _paymentMethod,
-                                    );
-                                    if (preview != null) {
-                                      _showThermalReceiptPreview(context, preview);
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Preview Failed: ${provider.errorMessage ?? "Unknown error"}'),
-                                          backgroundColor: const Color(0xFFEF4444),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                icon: const Icon(Icons.preview_outlined, size: 16, color: Color(0xFF475569)),
-                                label: const Text('PREVIEW', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 12)),
+                                child: const Icon(Icons.qr_code_2_outlined, color: Color(0xFF0F172A), size: 50),
                               ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2563EB),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('UPI INSTANT QR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Instruct client to scan the active POS scanner screen or billing desk card.',
+                                      style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                                    ),
+                                  ],
                                 ),
-                                onPressed: () async {
-                                  if (_formKey.currentState!.validate()) {
-                                    final invoiceId = await provider.createInvoice(
-                                      customerName: _customerNameController.text,
-                                      customerPhone: _customerPhoneController.text,
-                                      paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
-                                      paymentMethod: _paymentMethod,
-                                    );
-                                    if (invoiceId != null) {
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context).clearSnackBars();
-                                      final productProvider = Provider.of<ProductProvider>(context, listen: false);
-                                      productProvider.fetchProducts(pageSize: 100);
-                                      _showSuccessWithDownload(context, provider, invoiceId);
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Creation Failed: ${provider.errorMessage ?? "Unknown error"}'),
-                                          backgroundColor: const Color(0xFFEF4444),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.white),
-                                label: const Text('CONFIRM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                              ),
+                              )
                             ],
                           ),
+                        ),
                       ],
-                    ),
-                    const SizedBox(height: 24),
-                  ],
+  
+                      const SizedBox(height: 24),
+                      const Divider(color: Color(0xFFE2E8F0)),
+  
+                      // Net Pay and Actions
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('NET TO COLLECT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                              Text(currencyFormat.format(provider.grandTotal), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                            ],
+                          ),
+                          if (provider.isLoading)
+                            const CircularProgressIndicator(color: Color(0xFF2563EB))
+                          else
+                            Row(
+                              children: [
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                  ),
+                                  onPressed: () async {
+                                    if (_formKey.currentState!.validate()) {
+                                      final preview = await provider.previewInvoice(
+                                        customerName: _customerNameController.text,
+                                        customerPhone: _customerPhoneController.text,
+                                        paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
+                                        paymentMethod: _paymentMethod,
+                                      );
+                                      if (preview != null) {
+                                        _showThermalReceiptPreview(context, preview);
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Preview Failed: ${provider.errorMessage ?? "Unknown error"}'),
+                                            backgroundColor: const Color(0xFFEF4444),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  icon: const Icon(Icons.preview_outlined, size: 16, color: Color(0xFF475569)),
+                                  label: const Text('PREVIEW', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 12)),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                  ),
+                                  onPressed: () => _onConfirmPressed(provider),
+                                  icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.white),
+                                  label: const Text('CONFIRM (Ctrl+Ent)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
               ),
             ),
-          );
-        },
+          ),
+        );
+      },
       ),
     );
+  }
+
+  void _onConfirmPressed(BillingProvider provider) async {
+    if (_formKey.currentState!.validate()) {
+      final invoiceId = await provider.createInvoice(
+        customerName: _customerNameController.text,
+        customerPhone: _customerPhoneController.text,
+        paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
+        paymentMethod: _paymentMethod,
+      );
+      if (invoiceId != null) {
+        if (mounted) Navigator.pop(context);
+        ScaffoldMessenger.of(context).clearSnackBars();
+        final productProvider = Provider.of<ProductProvider>(context, listen: false);
+        productProvider.fetchProducts(pageSize: 100);
+        _showSuccessWithDownload(context, provider, invoiceId);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Creation Failed: ${provider.errorMessage ?? "Unknown error"}'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
   }
 
   Widget _paymentSegment(String label, IconData icon, bool active, VoidCallback onTap) {
@@ -1642,7 +1780,7 @@ class _BillingScreenState extends State<BillingScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              "  ${item['quantity']} ${item['unit']?.toString().toLowerCase() ?? 'piece'} @ ₹${double.parse(item['unit_price']?.toString() ?? '0').toStringAsFixed(2)}",
+                              "  ${item['quantity']} ${item['unit']?.toString().toLowerCase() == 'piece' ? 'unit' : (item['unit']?.toString().toLowerCase() ?? 'unit')} @ ₹${double.parse(item['unit_price']?.toString() ?? '0').toStringAsFixed(2)}",
                               style: const TextStyle(color: Colors.black87, fontSize: 10, fontFamily: 'monospace'),
                             ),
                             Text(
@@ -1895,7 +2033,7 @@ class _BillingScreenState extends State<BillingScreen> {
       decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: [
-          Expanded(child: _buildUnitOption('Box', currentUnit == 'PIECE', () => onToggle('PIECE'))),
+          Expanded(child: _buildUnitOption('Unit', currentUnit == 'PIECE', () => onToggle('PIECE'))),
           Expanded(child: _buildUnitOption('Cent (10x)', currentUnit == 'CENT', () => onToggle('CENT'))),
         ],
       ),
@@ -1930,84 +2068,91 @@ class _BillingScreenState extends State<BillingScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          constraints: const BoxConstraints(maxWidth: 420),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 54),
-              ),
-              const SizedBox(height: 16),
-              const Text('TRANSACTION COMPLETE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A))),
-              const SizedBox(height: 4),
-              const Text(
-                'Invoice created successfully.',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-              ),
-              const SizedBox(height: 24),
-              const Divider(color: Color(0xFFE2E8F0)),
-              const SizedBox(height: 12),
-              
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  const Icon(Icons.print_outlined, color: Color(0xFF94A3B8), size: 16),
-                  const SizedBox(width: 6),
-                  const Text('PRINT & EXPORT OPTIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF64748B))),
-                ],
-              ),
-              const SizedBox(height: 12),
-              
-              _buildPrintOption(
-                icon: Icons.picture_as_pdf_outlined,
-                label: 'Standard Invoice (A4 PDF)',
-                subtitle: 'Export high resolution pdf ledger',
-                onTap: () async => _launchInvoiceUrl(context, await provider.getInvoicePdfUrl(invoiceId)),
-              ),
-              const SizedBox(height: 10),
-              _buildPrintOption(
-                icon: Icons.chrome_reader_mode_outlined,
-                label: 'Responsive HTML Bill',
-                subtitle: 'Direct browser layouts & templates',
-                onTap: () async => _launchInvoiceUrl(context, await provider.getInvoicePrintHtmlUrl(invoiceId)),
-              ),
-              const SizedBox(height: 10),
-              _buildPrintOption(
-                icon: Icons.receipt_long_outlined,
-                label: 'Thermal Receipt (80mm)',
-                subtitle: 'Direct desktop/receipt printing paper',
-                onTap: () async => _launchInvoiceUrl(context, await provider.getInvoiceThermalReceiptUrl(invoiceId)),
-              ),
-              const SizedBox(height: 24),
-              
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    foregroundColor: const Color(0xFF0F172A),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      builder: (context) => CallbackShortcuts(
+        bindings: {
+          SingleActivator(LogicalKeyboardKey.escape): () {
+            Navigator.pop(context);
+          },
+        },
+        child: Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 420),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.12),
+                    shape: BoxShape.circle,
                   ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 54),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                const Text('TRANSACTION COMPLETE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A))),
+                const SizedBox(height: 4),
+                const Text(
+                  'Invoice created successfully.',
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                ),
+                const SizedBox(height: 24),
+                const Divider(color: Color(0xFFE2E8F0)),
+                const SizedBox(height: 12),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.print_outlined, color: Color(0xFF94A3B8), size: 16),
+                    const SizedBox(width: 6),
+                    const Text('PRINT & EXPORT OPTIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: Color(0xFF64748B))),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                
+                _buildPrintOption(
+                  icon: Icons.picture_as_pdf_outlined,
+                  label: 'Standard Invoice (A4 PDF)',
+                  subtitle: 'Export high resolution pdf ledger',
+                  onTap: () async => _launchInvoiceUrl(context, await provider.getInvoicePdfUrl(invoiceId)),
+                ),
+                const SizedBox(height: 10),
+                _buildPrintOption(
+                  icon: Icons.chrome_reader_mode_outlined,
+                  label: 'Responsive HTML Bill',
+                  subtitle: 'Direct browser layouts & templates',
+                  onTap: () async => _launchInvoiceUrl(context, await provider.getInvoicePrintHtmlUrl(invoiceId)),
+                ),
+                const SizedBox(height: 10),
+                _buildPrintOption(
+                  icon: Icons.receipt_long_outlined,
+                  label: 'Thermal Receipt (80mm)',
+                  subtitle: 'Direct desktop/receipt printing paper',
+                  onTap: () async => _launchInvoiceUrl(context, await provider.getInvoiceThermalReceiptUrl(invoiceId)),
+                ),
+                const SizedBox(height: 24),
+                
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      foregroundColor: const Color(0xFF0F172A),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

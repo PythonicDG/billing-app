@@ -86,6 +86,7 @@ class ProductProvider with ChangeNotifier {
   bool _isLoading = false;
   String _searchQuery = '';
   String _ordering = 'created_at';
+  String _stockFilter = 'all'; // 'all', 'low_stock', 'out_of_stock', 'top_sellers'
   int _pageSize = 12;
 
   int _currentPage = 1;
@@ -101,6 +102,7 @@ class ProductProvider with ChangeNotifier {
   bool get hasPrevious => _previousUrl != null;
   int get currentPage => _currentPage;
   int get totalCount => _totalCount;
+  String get stockFilter => _stockFilter;
   int get totalPages => (_totalCount / _pageSize).ceil().clamp(1, 99999);
   Map<String, dynamic>? get inventoryAnalytics => _inventoryAnalytics;
 
@@ -133,16 +135,26 @@ class ProductProvider with ChangeNotifier {
   }
 
   Future<void> fetchFrequentProducts() async {
+    _isLoading = true;
+    _stockFilter = 'top_sellers';
+    notifyListeners();
     try {
       final response = await _apiService.get(ApiConstants.frequentProductsUrl);
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        _frequentProducts = data.map((p) => Product.fromJson(p)).toList();
+        _products = data.map((p) => Product.fromJson(p)).toList();
+        _frequentProducts = List.from(_products);
+        _totalCount = _products.length;
+        _currentPage = 1;
+        _nextUrl = null;
+        _previousUrl = null;
         notifyListeners();
       }
     } catch (e) {
       debugPrint('Error fetching frequent products: $e');
     }
+    _isLoading = false;
+    notifyListeners();
   }
 
   Future<bool> addCategory(String name, String? description) async {
@@ -163,18 +175,26 @@ class ProductProvider with ChangeNotifier {
 
   /// Fetch a specific page from the server (server-side pagination).
   Future<void> fetchPage(int page) async {
+    if (_stockFilter == 'top_sellers') return; // Top sellers doesn't support pagination here
+
     _isLoading = true;
     notifyListeners();
 
     try {
+      final Map<String, String> params = {
+        'search': _searchQuery,
+        'ordering': _ordering,
+        'page': page.toString(),
+        'page_size': _pageSize.toString(),
+      };
+      
+      if (_stockFilter != 'all') {
+        params['stock_filter'] = _stockFilter;
+      }
+
       final response = await _apiService.get(
         ApiConstants.productsUrl,
-        queryParams: {
-          'search': _searchQuery,
-          'ordering': _ordering,
-          'page': page.toString(),
-          'page_size': _pageSize.toString(),
-        },
+        queryParams: params,
       );
 
       if (response.statusCode == 200) {
@@ -203,6 +223,10 @@ class ProductProvider with ChangeNotifier {
   }
 
   Future<void> fetchProducts({bool initial = true, String? url, int? pageSize}) async {
+    if (_stockFilter == 'top_sellers' && url == null) {
+      return fetchFrequentProducts();
+    }
+
     _isLoading = true;
     if (initial) {
       _currentPage = 1;
@@ -214,14 +238,22 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiService.get(
-        url ?? ApiConstants.productsUrl,
-        queryParams: url == null ? {
+      Map<String, String>? params;
+      if (url == null) {
+        params = {
           'search': _searchQuery,
           'ordering': _ordering,
           'page': _currentPage.toString(),
           'page_size': _pageSize.toString(),
-        } : null,
+        };
+        if (_stockFilter != 'all') {
+          params['stock_filter'] = _stockFilter;
+        }
+      }
+
+      final response = await _apiService.get(
+        url ?? ApiConstants.productsUrl,
+        queryParams: params,
       );
 
       if (response.statusCode == 200) {
@@ -249,6 +281,16 @@ class ProductProvider with ChangeNotifier {
 
   String? get nextUrl => _nextUrl;
   String? get previousUrl => _previousUrl;
+
+  void setStockFilter(String filter) {
+    _stockFilter = filter;
+    _currentPage = 1;
+    if (filter == 'top_sellers') {
+      fetchFrequentProducts();
+    } else {
+      fetchProducts();
+    }
+  }
 
   void setSearch(String query) {
     _searchQuery = query;

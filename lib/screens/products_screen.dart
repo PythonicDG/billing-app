@@ -48,15 +48,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
     required Color accentColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -64,13 +64,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: accentColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: iconColor, size: 20),
+            child: Icon(icon, color: iconColor, size: 16),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -81,17 +81,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF94A3B8),
-                    letterSpacing: 0.8,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: valueColor,
                   ),
@@ -132,7 +132,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             mainAxisSpacing: 12,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: crossAxisCount == 1 ? 4.5 : 2.5,
+            childAspectRatio: crossAxisCount == 1 ? 5.5 : 3.5,
             children: [
               _buildStatCard(
                 icon: Icons.account_balance_wallet_outlined,
@@ -318,6 +318,49 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ),
           
           _buildSummaryCards(productProvider),
+
+          // Filter Chips for one-tap filtering
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip(
+                    label: 'All Products',
+                    icon: Icons.inventory_2_outlined,
+                    isActive: productProvider.stockFilter == 'all',
+                    onTap: () => productProvider.setStockFilter('all'),
+                    color: const Color(0xFF2563EB),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    label: 'Low Stock',
+                    icon: Icons.warning_amber_outlined,
+                    isActive: productProvider.stockFilter == 'low_stock',
+                    onTap: () => productProvider.setStockFilter('low_stock'),
+                    color: const Color(0xFFF59E0B),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    label: 'Out of Stock',
+                    icon: Icons.error_outline,
+                    isActive: productProvider.stockFilter == 'out_of_stock',
+                    onTap: () => productProvider.setStockFilter('out_of_stock'),
+                    color: const Color(0xFFEF4444),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    label: 'Top Sellers',
+                    icon: Icons.auto_graph_outlined,
+                    isActive: productProvider.stockFilter == 'top_sellers',
+                    onTap: () => productProvider.setStockFilter('top_sellers'),
+                    color: const Color(0xFF10B981),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
           // Inventory Header Summary
           Padding(
@@ -581,7 +624,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         );
                       })(),
           ),
-          if (!productProvider.isLoading && productProvider.totalPages > 1)
+          if (!productProvider.isLoading && productProvider.totalPages > 1 && productProvider.stockFilter == 'all')
             _buildPagination(productProvider.totalPages, productProvider),
         ],
       ),
@@ -843,6 +886,46 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }).toList();
   }
 
+
+  Widget _buildFilterChip({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+    required Color color,
+  }) {
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+          color: isActive ? Colors.white : const Color(0xFF64748B),
+        ),
+      ),
+      avatar: Icon(
+        icon,
+        size: 14,
+        color: isActive ? Colors.white : color,
+      ),
+      selected: isActive,
+      onSelected: (_) => onTap(),
+      selectedColor: color,
+      backgroundColor: Colors.white,
+      showCheckmark: false,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: isActive ? Colors.transparent : const Color(0xFFE2E8F0),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+      labelPadding: const EdgeInsets.only(right: 4),
+      elevation: isActive ? 1 : 0,
+      pressElevation: 2,
+    );
+  }
 
   void _showSortOptions(BuildContext context, ProductProvider provider) {
     showModalBottomSheet(

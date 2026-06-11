@@ -49,7 +49,7 @@ class _BillingScreenState extends State<BillingScreen> {
   static const int _itemsPerPage = 12;
 
   // For POS calculations
-  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: 'Rs.');
 
   @override
   void initState() {
@@ -1035,7 +1035,7 @@ class _BillingScreenState extends State<BillingScreen> {
                                           child: Row(
                                             children: [
                                               const Text(
-                                                '₹',
+                                                'Rs.',
                                                 style: TextStyle(
                                                   color: Color(0xFF475569),
                                                   fontSize: 10,
@@ -1479,7 +1479,7 @@ class _BillingScreenState extends State<BillingScreen> {
                                 keyboardType: TextInputType.number,
                                 style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                                 decoration: const InputDecoration(
-                                  labelText: 'Received Cash (₹)',
+                                  labelText: 'Received Cash (Rs.)',
                                   prefixIcon: Icon(Icons.payments_outlined),
                                   filled: true,
                                   fillColor: Color(0xFFF8FAFC),
@@ -1780,11 +1780,11 @@ class _BillingScreenState extends State<BillingScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              "  ${item['quantity']} ${item['unit']?.toString().toLowerCase() == 'piece' ? 'unit' : (item['unit']?.toString().toLowerCase() ?? 'unit')} @ ₹${double.parse(item['unit_price']?.toString() ?? '0').toStringAsFixed(2)}",
+                              "  ${item['quantity']} ${item['unit']?.toString().toLowerCase() == 'piece' ? 'unit' : (item['unit']?.toString().toLowerCase() ?? 'unit')} @ Rs.${double.parse(item['unit_price']?.toString() ?? '0').toStringAsFixed(2)}",
                               style: const TextStyle(color: Colors.black87, fontSize: 10, fontFamily: 'monospace'),
                             ),
                             Text(
-                              "₹${totPrice.toStringAsFixed(2)}",
+                              "Rs.${totPrice.toStringAsFixed(2)}",
                               style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'monospace'),
                             ),
                           ],
@@ -1797,11 +1797,11 @@ class _BillingScreenState extends State<BillingScreen> {
                 const Text('--------------------------------', style: TextStyle(color: Colors.black45, fontSize: 12, fontFamily: 'monospace')),
                 
                 // Calculations
-                _receiptRow('SUB-TOTAL', '₹${double.parse(data['sub_total']?.toString() ?? '0').toStringAsFixed(2)}'),
+                _receiptRow('SUB-TOTAL', 'Rs.${double.parse(data['sub_total']?.toString() ?? '0').toStringAsFixed(2)}'),
                 if (double.parse(data['tax_amount']?.toString() ?? '0') > 0)
-                  _receiptRow('TAX / GST', '₹${double.parse(data['tax_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
+                  _receiptRow('TAX / GST', 'Rs.${double.parse(data['tax_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
                 if (double.parse(data['discount_amount']?.toString() ?? '0') > 0)
-                  _receiptRow('DISCOUNT', '-₹${double.parse(data['discount_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
+                  _receiptRow('DISCOUNT', '-Rs.${double.parse(data['discount_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
                 
                 const Text('--------------------------------', style: TextStyle(color: Colors.black45, fontSize: 12, fontFamily: 'monospace')),
                 
@@ -1810,13 +1810,13 @@ class _BillingScreenState extends State<BillingScreen> {
                   children: [
                     const Text('GRAND TOTAL', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'monospace')),
                     Text(
-                      '₹${double.parse(data['grand_total']?.toString() ?? '0').toStringAsFixed(2)}',
+                      'Rs.${double.parse(data['grand_total']?.toString() ?? '0').toStringAsFixed(2)}',
                       style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'monospace'),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                _receiptRow('AMOUNT PAID', '₹${double.parse(data['paid_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
+                _receiptRow('AMOUNT PAID', 'Rs.${double.parse(data['paid_amount']?.toString() ?? '0').toStringAsFixed(2)}'),
                 
                 // Due / Outstanding
                 (() {
@@ -1825,7 +1825,7 @@ class _BillingScreenState extends State<BillingScreen> {
                   double due = (total - paid).clamp(0, double.infinity);
                   return _receiptRow(
                     'OUTSTANDING DUE', 
-                    '₹${due.toStringAsFixed(2)}',
+                    'Rs.${due.toStringAsFixed(2)}',
                   );
                 })(),
                 

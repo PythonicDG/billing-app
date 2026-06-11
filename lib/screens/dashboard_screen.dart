@@ -19,7 +19,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _autoRefreshTimer;
   DateTime? _lastRefreshed;
-  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: 'Rs.');
 
   // Local pagination state for stock status alerts
   int _stockCurrentPage = 1;

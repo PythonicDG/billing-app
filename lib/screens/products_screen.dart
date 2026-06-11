@@ -19,7 +19,7 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
   final _searchController = TextEditingController();
-  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: 'Rs.');
   String _activeOrdering = '-created_at';
   Timer? _debounce;
 
@@ -533,8 +533,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                   ),
                                                 ),
                                                 if (isOwner)
-                                                  DataCell(SizedBox(width: purchaseWidth, child: Text('₹${product.purchasePrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12)))),
-                                                DataCell(SizedBox(width: sellingWidth, child: Text('₹${product.sellingPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF2563EB))))),
+                                                  DataCell(SizedBox(width: purchaseWidth, child: Text('Rs.${product.purchasePrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12)))),
+                                                DataCell(SizedBox(width: sellingWidth, child: Text('Rs.${product.sellingPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF2563EB))))),
                                                 DataCell(SizedBox(width: casesWidth, child: Text('${product.noOfCase} cs', style: const TextStyle(fontSize: 12)))),
                                                 DataCell(SizedBox(width: centCsWidth, child: Text('${product.centInPerCs} cent', style: const TextStyle(fontSize: 12)))),
                                                 DataCell(

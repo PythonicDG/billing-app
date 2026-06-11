@@ -33,7 +33,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   // Expanded invoice tracking
   String? _expandedInvoiceNumber;
 
-  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+  final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: 'Rs.');
 
   bool _initialized = false;
 
@@ -72,6 +72,15 @@ class _LedgerScreenState extends State<LedgerScreen> {
       setState(() {
         _customers = list;
         _isLoadingCustomers = false;
+        
+        // Update selected customer if it exists in the new list to ensure it has latest balance
+        if (_selectedCustomer != null) {
+          try {
+            _selectedCustomer = list.firstWhere((c) => c.id == _selectedCustomer!.id);
+          } catch (e) {
+            // Keep existing if not found in filtered list
+          }
+        }
       });
     });
   }
@@ -98,6 +107,219 @@ class _LedgerScreenState extends State<LedgerScreen> {
         _isLoadingLedger = false;
       });
     });
+  }
+
+  void _sendWhatsAppReminder(Customer customer) async {
+    final outstanding = customer.outstandingBalance;
+    final message = "Hi ${customer.name}, your outstanding balance at Fataka App is ${currencyFormat.format(outstanding)}. Please settle your pending bills. Thank you!";
+    final encodedMessage = Uri.encodeComponent(message);
+    // Format phone number to be international if needed, but for India standard 10 digits usually works with wa.me
+    String phone = customer.phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (phone.length == 10) phone = "91$phone";
+    
+    final url = "https://wa.me/$phone?text=$encodedMessage";
+    
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch WhatsApp')),
+        );
+      }
+    }
+  }
+
+  void _showBulkPaymentDialog() {
+    if (_selectedCustomer == null) return;
+    
+    final outstanding = double.tryParse(_selectedLedger?['total_outstanding']?.toString() ?? '0.0') ?? 0.0;
+    if (outstanding <= 0) {
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No outstanding balance to settle.')),
+      );
+      return;
+    }
+
+    final amountController = TextEditingController(text: outstanding.toStringAsFixed(2));
+    final notesController = TextEditingController();
+    String selectedMode = 'CASH';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return CallbackShortcuts(
+          bindings: {
+            SingleActivator(LogicalKeyboardKey.escape): () {
+              Navigator.pop(context);
+            },
+          },
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                title: Row(
+                  children: [
+                    const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF2563EB)),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Record Bulk Payment',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Total Outstanding: ${currencyFormat.format(outstanding)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFEF4444), fontSize: 14),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Payment Amount',
+                          prefixText: 'Rs. ',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          helperText: 'This amount will be applied to the oldest bills first.',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Payment Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF475569))),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setDialogState(() => selectedMode = 'CASH'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: selectedMode == 'CASH' ? const Color(0xFFEFF6FF) : Colors.white,
+                                  border: Border.all(color: selectedMode == 'CASH' ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0)),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.money, color: selectedMode == 'CASH' ? const Color(0xFF2563EB) : const Color(0xFF64748B), size: 18),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'CASH',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: selectedMode == 'CASH' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setDialogState(() => selectedMode = 'UPI'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: selectedMode == 'UPI' ? const Color(0xFFEFF6FF) : Colors.white,
+                                  border: Border.all(color: selectedMode == 'UPI' ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0)),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.qr_code, color: selectedMode == 'UPI' ? const Color(0xFF2563EB) : const Color(0xFF64748B), size: 18),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'UPI',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: selectedMode == 'UPI' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: notesController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Notes (Optional)',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B))),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F2C59),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: const Size(120, 40),
+                    ),
+                    onPressed: () {
+                      final amount = double.tryParse(amountController.text) ?? 0.0;
+                      if (amount <= 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Invalid payment amount')),
+                        );
+                        return;
+                      }
+                      Navigator.pop(context);
+                      setState(() {
+                        _isLoadingLedger = true;
+                      });
+                      Provider.of<BillingProvider>(context, listen: false)
+                          .recordBulkPayment(_selectedCustomer!.id, amount, selectedMode, notesController.text)
+                          .then((success) {
+                        if (!mounted) return;
+                        if (success) {
+                          Provider.of<DashboardProvider>(context, listen: false).refreshAll();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Bulk payment recorded successfully')),
+                          );
+                          
+                          // Refresh customer list to update outstanding balance in the sidebar/list
+                          _fetchCustomers(_searchController.text);
+                          
+                          if (_selectedCustomer != null) {
+                            _selectCustomer(_selectedCustomer!);
+                          }
+                        } else {
+                          setState(() {
+                            _isLoadingLedger = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Failed to record bulk payment')),
+                          );
+                        }
+                      });
+                    },
+                    child: const Text('RECORD PAYMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   void _showRecordPaymentDialog(Map<String, dynamic> bill) {
@@ -149,7 +371,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       },
                       decoration: InputDecoration(
                         labelText: 'Payment Amount',
-                        prefixText: '₹ ',
+                        prefixText: 'Rs. ',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
@@ -258,6 +480,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Payment recorded successfully')),
                         );
+                        
+                        // Refresh customer list to update outstanding balance in the sidebar/list
+                        _fetchCustomers(_searchController.text);
+                        
                         if (_selectedCustomer != null) {
                           _selectCustomer(_selectedCustomer!);
                         }
@@ -291,194 +517,298 @@ class _LedgerScreenState extends State<LedgerScreen> {
       return true;
     }).toList();
 
-    // 2. Sort: outstanding balance first (descending), then settled (alphabetically by name)
-    filteredCustomers.sort((a, b) {
-      if (a.outstandingBalance > 0 && b.outstandingBalance == 0) {
-        return -1;
-      } else if (a.outstandingBalance == 0 && b.outstandingBalance > 0) {
-        return 1;
-      } else if (a.outstandingBalance > 0 && b.outstandingBalance > 0) {
-        return b.outstandingBalance.compareTo(a.outstandingBalance);
-      } else {
-        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-      }
-    });
+    // Separate into sections for a cleaner layout
+    final outstanding = filteredCustomers.where((c) => c.outstandingBalance > 0).toList();
+    final settled = filteredCustomers.where((c) => c.outstandingBalance == 0).toList();
+
+    // Sort: Outstanding by amount (highest first), Settled alphabetically
+    outstanding.sort((a, b) => b.outstandingBalance.compareTo(a.outstandingBalance));
+    settled.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     return Container(
-      color: Colors.white,
+      color: const Color(0xFFF8FAFC), // Subtle background for the sidebar
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Search customer...',
-                prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFF2563EB)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
-              ),
+          // Search & Filter Header
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
             ),
-          ),
-          
-          // Filter Toggle Row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => setState(() => _filterOption = 'ALL'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _filterOption == 'ALL' ? const Color(0xFF0F2C59) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'All',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: _filterOption == 'ALL' ? Colors.white : const Color(0xFF475569),
-                        ),
-                      ),
+                TextField(
+                  controller: _searchController,
+                  onChanged: _onSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Search customer...',
+                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                    prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF2563EB), size: 20),
+                    filled: true,
+                    fillColor: const Color(0xFFF1F5F9),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => setState(() => _filterOption = 'OUTSTANDING'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _filterOption == 'OUTSTANDING' ? const Color(0xFF0F2C59) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Outstanding Only',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: _filterOption == 'OUTSTANDING' ? Colors.white : const Color(0xFF475569),
-                        ),
-                      ),
-                    ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildFilterToggle('ALL', 'All Customers'),
+                      _buildFilterToggle('OUTSTANDING', 'Outstanding'),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          
           Expanded(
             child: _isLoadingCustomers
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 3))
                 : filteredCustomers.isEmpty
-                    ? const Center(child: Text('No customers found', style: TextStyle(color: Color(0xFF64748B))))
-                    : ListView.separated(
-                        itemCount: filteredCustomers.length,
-                        separatorBuilder: (context, index) => const Divider(height: 1, thickness: 0.8),
-                        itemBuilder: (context, index) {
-                          final customer = filteredCustomers[index];
-                          final isSelected = _selectedCustomer?.id == customer.id;
-
-                          bool showSettledHeader = false;
-                          if (index > 0) {
-                            final prev = filteredCustomers[index - 1];
-                            final curr = filteredCustomers[index];
-                            if (prev.outstandingBalance > 0 && curr.outstandingBalance == 0) {
-                              showSettledHeader = true;
-                            }
-                          } else if (index == 0 && filteredCustomers[index].outstandingBalance == 0) {
-                            showSettledHeader = true;
-                          }
-
-                          Widget tile = Container(
-                            decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFFF8FAFC) : Colors.transparent,
-                              border: Border(
-                                left: BorderSide(
-                                  color: customer.outstandingBalance > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                                  width: 4,
-                                ),
-                              ),
-                            ),
-                            child: ListTile(
-                              selected: isSelected,
-                              title: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      customer.name,
-                                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15, color: Color(0xFF0F172A)),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (customer.outstandingBalance > 0)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFEE2E2),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Text(
-                                        currencyFormat.format(customer.outstandingBalance),
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEF4444)),
-                                      ),
-                                    )
-                                  else
-                                    const Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 18),
-                                ],
-                              ),
-                              subtitle: Text(
-                                customer.phone,
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                              ),
-                              leading: CircleAvatar(
-                                backgroundColor: customer.outstandingBalance > 0 
-                                    ? const Color(0xFFFEE2E2) 
-                                    : (isSelected ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9)),
-                                child: Text(
-                                  customer.name.substring(0, 1).toUpperCase(),
-                                  style: TextStyle(
-                                    color: customer.outstandingBalance > 0 
-                                        ? const Color(0xFFEF4444) 
-                                        : (isSelected ? Colors.white : const Color(0xFF475569)),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              onTap: () => _selectCustomer(customer),
-                            ),
-                          );
-
-                          if (showSettledHeader) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Padding(
-                                  padding: EdgeInsets.only(left: 16.0, top: 12.0, bottom: 6.0),
-                                  child: Text(
-                                    'SETTLED CUSTOMERS',
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 1.0),
-                                  ),
-                                ),
-                                const Divider(height: 1),
-                                tile,
-                              ],
-                            );
-                          }
-                          return tile;
-                        },
+                    ? _buildEmptyState()
+                    : ListView(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        children: [
+                          if (outstanding.isNotEmpty) ...[
+                             _buildSectionHeader('DUE NOW', Icons.priority_high_rounded, const Color(0xFFEF4444)),
+                             ...outstanding.map((c) => _buildCustomerTile(c)),
+                          ],
+                          if (settled.isNotEmpty && _filterOption == 'ALL') ...[
+                             const SizedBox(height: 16),
+                             _buildSectionHeader('FULLY SETTLED', Icons.check_circle_rounded, const Color(0xFF10B981)),
+                             ...settled.map((c) => _buildCustomerTile(c)),
+                          ],
+                        ],
                       ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFilterToggle(String option, String label) {
+    final isSelected = _filterOption == option;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _filterOption = option),
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    const BoxShadow(
+                      color: Color(0x0F000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    )
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+              color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, Color color) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Divider(color: color.withOpacity(0.15), thickness: 1)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person_search_rounded, size: 48, color: const Color(0xFFCBD5E1)),
+          const SizedBox(height: 16),
+          const Text(
+            'No customers found',
+            style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerTile(Customer customer) {
+    final isSelected = _selectedCustomer?.id == customer.id;
+    final isOutstanding = customer.outstandingBalance > 0;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? const Color(0xFFBFDBFE) : Colors.transparent,
+          width: 1,
+        ),
+        boxShadow: isSelected
+            ? null
+            : [
+                const BoxShadow(
+                  color: Color(0x05000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        onTap: () => _selectCustomer(customer),
+        leading: Stack(
+          children: [
+            CircleAvatar(
+              backgroundColor: isOutstanding 
+                  ? const Color(0xFFFEE2E2) 
+                  : (isSelected ? const Color(0xFF2563EB) : const Color(0xFFF1F5F9)),
+              radius: 20,
+              child: Text(
+                customer.name.substring(0, 1).toUpperCase(),
+                style: TextStyle(
+                  color: isOutstanding 
+                      ? const Color(0xFFEF4444) 
+                      : (isSelected ? Colors.white : const Color(0xFF475569)),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            if (!isOutstanding)
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 14),
+                ),
+              ),
+          ],
+        ),
+        title: Text(
+          customer.name,
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            fontSize: 14,
+            color: const Color(0xFF0F172A),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          customer.phone,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (isOutstanding) ...[
+              Text(
+                currencyFormat.format(customer.outstandingBalance),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFEF4444),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildQuickAction(
+                    icon: Icons.message_rounded,
+                    color: const Color(0xFF25D366),
+                    onTap: () => _sendWhatsAppReminder(customer),
+                    tooltip: 'Send Reminder',
+                  ),
+                  const SizedBox(width: 10),
+                  _buildQuickAction(
+                    icon: Icons.add_card_rounded,
+                    color: const Color(0xFF2563EB),
+                    onTap: () {
+                      _selectCustomer(customer);
+                      Future.delayed(const Duration(milliseconds: 300), () {
+                        _showBulkPaymentDialog();
+                      });
+                    },
+                    tooltip: 'Record Payment',
+                  ),
+                ],
+              ),
+            ] else
+               const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAction({required IconData icon, required Color color, required VoidCallback onTap, required String tooltip}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withOpacity(0.1)),
+        ),
+        child: Icon(icon, size: 13, color: color),
       ),
     );
   }
@@ -548,30 +878,69 @@ class _LedgerScreenState extends State<LedgerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Customer Name/Phone Panel
+          // Customer Name/Phone Panel with Actions
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _selectedLedger!['customer_name'] ?? '',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedLedger!['customer_name'] ?? '',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Phone: ${_selectedLedger!['customer_phone'] ?? ''}',
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Phone: ${_selectedLedger!['customer_phone'] ?? ''}',
-                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                const SizedBox(width: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _showStatementPreviewDialog,
+                      icon: const Icon(Icons.description_outlined, size: 18, color: Colors.white),
+                      label: const Text('STATEMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF64748B),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                    ),
+                    if (calculatedOutstanding > 0)
+                      ElevatedButton.icon(
+                        onPressed: _showBulkPaymentDialog,
+                        icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
+                        label: const Text('RECORD BULK PAYMENT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
           ),
           
-          // Proper Summary Bar Card
+          // Proper Summary Bar Card (Sticky)
           Container(
             margin: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 8),
             padding: const EdgeInsets.all(16),
@@ -583,16 +952,21 @@ class _LedgerScreenState extends State<LedgerScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('TOTAL BILLED', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
-                      const SizedBox(height: 4),
-                      Text(
-                        currencyFormat.format(totalBilled),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                      ),
-                    ],
+                  child: InkWell(
+                    onTap: () => setState(() => _invoiceFilter = 'ALL'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('TOTAL BILLED', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
+                        const SizedBox(height: 4),
+                        Text(
+                          currencyFormat.format(totalBilled),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                        if (_invoiceFilter == 'ALL')
+                           Container(height: 2, width: 40, color: const Color(0xFF2563EB), margin: const EdgeInsets.only(top: 4)),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -611,34 +985,37 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: calculatedOutstanding > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: calculatedOutstanding > 0 ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'OUTSTANDING',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: calculatedOutstanding > 0 ? const Color(0xFFB91C1C) : const Color(0xFF15803D),
+                  child: InkWell(
+                    onTap: () => setState(() => _invoiceFilter = 'UNPAID_PARTIAL'),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: calculatedOutstanding > 0 ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _invoiceFilter == 'UNPAID_PARTIAL' ? const Color(0xFFEF4444) : (calculatedOutstanding > 0 ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC))),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'OUTSTANDING',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: calculatedOutstanding > 0 ? const Color(0xFFB91C1C) : const Color(0xFF15803D),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          currencyFormat.format(calculatedOutstanding),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: calculatedOutstanding > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                          const SizedBox(height: 4),
+                          Text(
+                            currencyFormat.format(calculatedOutstanding),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: calculatedOutstanding > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1165,69 +1542,163 @@ class _LedgerScreenState extends State<LedgerScreen> {
   );
 }
 
-void _showDeleteConfirmationDialog(BuildContext context, String invoiceId, String invoiceNumber) {
-  showDialog(
-    context: context,
-    builder: (context) {
-      return CallbackShortcuts(
-        bindings: {
-          SingleActivator(LogicalKeyboardKey.escape): () {
-            Navigator.pop(context);
-          },
-        },
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          title: Row(
+  void _showDeleteConfirmationDialog(BuildContext context, String invoiceId, String invoiceNumber) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Row(
             children: [
-              const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
-              const SizedBox(width: 8),
-              const Text('Delete Bill', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
+              SizedBox(width: 8),
+              Text('Confirm Delete', style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
-          content: Text('Are you sure you want to delete bill $invoiceNumber? This action will restore product stock levels and cannot be undone.'),
-          actions: [
+          content: Text('Are you sure you want to delete bill $invoiceNumber?\n\nThis action cannot be undone and will restore the product stock quantities.'),
+          actions: <Widget>[
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B))),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-                setState(() {
-                  _isLoadingLedger = true;
-                });
-                Provider.of<BillingProvider>(context, listen: false)
-                    .deleteInvoice(invoiceId)
-                    .then((success) {
-                  if (!context.mounted) return;
+              onPressed: () async {
+                final provider = Provider.of<BillingProvider>(context, listen: false);
+                Navigator.of(dialogContext).pop();
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Row(
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Deleting bill...'),
+                      ],
+                    ),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+
+                final success = await provider.deleteInvoice(invoiceId);
+                
+                if (context.mounted) {
                   if (success) {
-                    Provider.of<DashboardProvider>(context, listen: false).refreshAll();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Bill deleted successfully'),
+                        backgroundColor: Color(0xFF10B981),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    // Refresh ledger
                     if (_selectedCustomer != null) {
                       _selectCustomer(_selectedCustomer!);
+                      // Also refresh customers list to update balances
+                      _fetchCustomers(_searchController.text);
                     }
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Bill $invoiceNumber deleted successfully.')),
-                    );
                   } else {
-                    setState(() {
-                      _isLoadingLedger = false;
-                    });
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Failed to delete bill.')),
+                      const SnackBar(
+                        content: Text('Failed to delete bill'),
+                        backgroundColor: Color(0xFFEF4444),
+                        behavior: SnackBarBehavior.floating,
+                      ),
                     );
                   }
-                });
+                }
               },
-              child: const Text('DELETE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Delete Bill', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
+
+  void _showStatementPreviewDialog() {
+    if (_selectedCustomer == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        final billingProvider = Provider.of<BillingProvider>(context, listen: false);
+        return CallbackShortcuts(
+          bindings: {
+            SingleActivator(LogicalKeyboardKey.escape): () {
+              Navigator.pop(context);
+            },
+          },
+          child: Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Container(
+              width: 900,
+              height: 700,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.description_outlined, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Statement Preview - ${_selectedCustomer!.name}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: PdfPreview(
+                      build: (format) async {
+                        final bytes = await billingProvider.getCustomerStatementBytes(_selectedCustomer!.id);
+                        if (bytes == null) {
+                          throw Exception('Failed to load Statement PDF');
+                        }
+                        return bytes;
+                      },
+                      allowPrinting: true,
+                      allowSharing: true,
+                      canChangePageFormat: false,
+                      canChangeOrientation: false,
+                      canDebug: false,
+                      loadingWidget: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      onError: (context, error) {
+                        return Center(
+                          child: Text(
+                            'Error loading PDF: $error',
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

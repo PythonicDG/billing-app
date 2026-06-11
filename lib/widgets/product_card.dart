@@ -18,7 +18,7 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+    final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: 'Rs.');
     final isOutOfStock = product.totalStockInCent <= 0;
 
     return Container(

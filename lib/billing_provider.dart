@@ -291,6 +291,24 @@ class BillingProvider with ChangeNotifier {
     return '${ApiConstants.baseUrl}${ApiConstants.invoiceThermalReceiptUrl(invoiceId)}?token=$token';
   }
 
+  Future<String?> getCustomerStatementUrl(String customerId) async {
+    final token = await _apiService.getToken();
+    if (token == null) return null;
+    return '${ApiConstants.baseUrl}/api/customers/$customerId/download_statement/?token=$token';
+  }
+
+  Future<Uint8List?> getCustomerStatementBytes(String customerId) async {
+    try {
+      final response = await _apiService.get('/api/customers/$customerId/download_statement/');
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+    } catch (e) {
+      debugPrint('Error fetching customer statement PDF bytes: $e');
+    }
+    return null;
+  }
+
   Future<Uint8List?> getInvoicePdfBytes(String invoiceId) async {
     try {
       final response = await _apiService.get(ApiConstants.invoiceDownloadPdfUrl(invoiceId));
@@ -341,6 +359,23 @@ class BillingProvider with ChangeNotifier {
       return response.statusCode == 201;
     } catch (e) {
       debugPrint('Error recording payment: $e');
+    }
+    return false;
+  }
+
+  Future<bool> recordBulkPayment(String customerId, double amount, String mode, String notes) async {
+    try {
+      final response = await _apiService.post(
+        '/api/customers/$customerId/record_bulk_payment/',
+        {
+          'amount': amount,
+          'mode': mode,
+          'notes': notes,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error recording bulk payment: $e');
     }
     return false;
   }

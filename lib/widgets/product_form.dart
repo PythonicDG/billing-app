@@ -27,11 +27,23 @@ class _ProductFormState extends State<ProductForm> {
     super.initState();
     _nameController = TextEditingController(text: widget.product?.name ?? '');
     _brandController = TextEditingController(text: widget.product?.brand ?? '');
-    _sellingPriceController = TextEditingController(text: widget.product?.sellingPrice.toString() ?? '');
-    _purchasePriceController = TextEditingController(text: widget.product?.purchasePrice.toString() ?? '');
-    _noOfCaseController = TextEditingController(text: widget.product?.noOfCase.toString() ?? '');
-    _centInPerCsController = TextEditingController(text: widget.product?.centInPerCs.toString() ?? '');
-    _minStockLevelController = TextEditingController(text: widget.product?.minStockLevel.toString() ?? '5');
+    
+    // Show empty string if value is 0 or null for better UX (as requested by user)
+    _sellingPriceController = TextEditingController(
+      text: (widget.product == null || widget.product!.sellingPrice == 0) ? '' : widget.product!.sellingPrice.toString()
+    );
+    _purchasePriceController = TextEditingController(
+      text: (widget.product == null || widget.product!.purchasePrice == 0) ? '' : widget.product!.purchasePrice.toString()
+    );
+    _noOfCaseController = TextEditingController(
+      text: (widget.product == null || widget.product!.noOfCase == 0) ? '' : widget.product!.noOfCase.toString()
+    );
+    _centInPerCsController = TextEditingController(
+      text: (widget.product == null || widget.product!.centInPerCs == 0) ? '' : widget.product!.centInPerCs.toString()
+    );
+    _minStockLevelController = TextEditingController(
+      text: widget.product?.minStockLevel.toString() ?? '5'
+    );
 
     _noOfCaseController.addListener(_updateTotalStock);
     _centInPerCsController.addListener(_updateTotalStock);
@@ -63,10 +75,10 @@ class _ProductFormState extends State<ProductForm> {
       final Map<String, dynamic> data = {
         'name': _nameController.text.trim(),
         'brand': _brandController.text.trim(),
-        'purchase_price': double.parse(_purchasePriceController.text),
-        'selling_price': double.parse(_sellingPriceController.text),
-        'no_of_case': int.parse(_noOfCaseController.text),
-        'cent_in_per_cs': int.parse(_centInPerCsController.text),
+        'purchase_price': double.tryParse(_purchasePriceController.text) ?? 0.0,
+        'selling_price': double.tryParse(_sellingPriceController.text) ?? 0.0,
+        'no_of_case': int.tryParse(_noOfCaseController.text) ?? 0,
+        'cent_in_per_cs': int.tryParse(_centInPerCsController.text) ?? 0,
         'min_stock_level': int.tryParse(_minStockLevelController.text) ?? 5,
       };
 

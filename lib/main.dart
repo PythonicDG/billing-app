@@ -12,7 +12,6 @@ import 'screens/dashboard_screen.dart';
 import 'screens/products_screen.dart';
 import 'screens/billing_screen.dart';
 import 'screens/ledger_screen.dart';
-import 'screens/reports_screen.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -56,7 +55,6 @@ class VighnahartaApp extends StatelessWidget {
         '/inventory': (context) => const ProductsScreen(),
         '/billing': (context) => const BillingScreen(),
         '/ledger': (context) => const LedgerScreen(),
-        '/reports': (context) => const ReportsScreen(),
       },
     );
   }

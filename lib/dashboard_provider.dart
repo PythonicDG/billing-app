@@ -12,59 +12,14 @@ class DashboardProvider with ChangeNotifier {
   String? _dashboardError;
   String _dashboardRange = 'today';
 
-  // Daily sales state
-  Map<String, dynamic>? _dailySalesData;
-  bool _isDailySalesLoading = false;
-  String? _dailySalesError;
-
-  // Outstanding customers state
-  Map<String, dynamic>? _outstandingData;
-  bool _isOutstandingLoading = false;
-  String? _outstandingError;
-
-  // Stock summary state
-  Map<String, dynamic>? _stockData;
-  bool _isStockLoading = false;
-  String? _stockError;
-
-  // Customer sales state
-  Map<String, dynamic>? _customerSalesData;
-  bool _isCustomerSalesLoading = false;
-  String? _customerSalesError;
-
   // Getters
   Map<String, dynamic>? get dashboardData => _dashboardData;
   bool get isDashboardLoading => _isDashboardLoading;
   String? get dashboardError => _dashboardError;
   String get dashboardRange => _dashboardRange;
 
-  Map<String, dynamic>? get dailySalesData => _dailySalesData;
-  bool get isDailySalesLoading => _isDailySalesLoading;
-  String? get dailySalesError => _dailySalesError;
-
-  Map<String, dynamic>? get outstandingData => _outstandingData;
-  bool get isOutstandingLoading => _isOutstandingLoading;
-  String? get outstandingError => _outstandingError;
-
-  Map<String, dynamic>? get stockData => _stockData;
-  bool get isStockLoading => _isStockLoading;
-  String? get stockError => _stockError;
-
-  Map<String, dynamic>? get customerSalesData => _customerSalesData;
-  bool get isCustomerSalesLoading => _isCustomerSalesLoading;
-  String? get customerSalesError => _customerSalesError;
-
   void refreshAll() {
     fetchDashboardSummary(range: _dashboardRange);
-    fetchOutstandingCustomers();
-    fetchStockSummary();
-    
-    // Always fetch daily sales for the currently selected date or today
-    String dateToFetch = DateTime.now().toIso8601String().split('T')[0];
-    if (_dailySalesData != null && _dailySalesData!['date'] != null) {
-      dateToFetch = _dailySalesData!['date'].toString();
-    }
-    fetchDailySales(dateToFetch);
   }
 
   Future<void> setDashboardRange(String range) async {
@@ -93,100 +48,6 @@ class DashboardProvider with ChangeNotifier {
     }
 
     _isDashboardLoading = false;
-    notifyListeners();
-  }
-
-  Future<void> fetchDailySales(String date) async {
-    _dailySalesData = null; // Clear old data to force loading state in UI
-    _isDailySalesLoading = true;
-    _dailySalesError = null;
-    notifyListeners();
-
-    try {
-      final response = await _apiService.get(
-        ApiConstants.dailySalesUrl,
-        queryParams: {'date': date},
-      );
-      if (response.statusCode == 200) {
-        _dailySalesData = jsonDecode(response.body) as Map<String, dynamic>;
-      } else {
-        _dailySalesError = 'Failed to load daily sales (${response.statusCode})';
-      }
-    } catch (e) {
-      _dailySalesError = 'Connection error: $e';
-    }
-
-    _isDailySalesLoading = false;
-    notifyListeners();
-  }
-
-  Future<void> fetchOutstandingCustomers() async {
-    _outstandingData = null;
-    _isOutstandingLoading = true;
-    _outstandingError = null;
-    notifyListeners();
-
-    try {
-      final response = await _apiService.get(ApiConstants.outstandingReportUrl);
-      if (response.statusCode == 200) {
-        _outstandingData = jsonDecode(response.body) as Map<String, dynamic>;
-      } else {
-        _outstandingError = 'Failed to load outstanding report (${response.statusCode})';
-      }
-    } catch (e) {
-      _outstandingError = 'Connection error: $e';
-    }
-
-    _isOutstandingLoading = false;
-    notifyListeners();
-  }
-
-  Future<void> fetchStockSummary() async {
-    _stockData = null;
-    _isStockLoading = true;
-    _stockError = null;
-    notifyListeners();
-
-    try {
-      final response = await _apiService.get(ApiConstants.stockSummaryUrl);
-      if (response.statusCode == 200) {
-        _stockData = jsonDecode(response.body) as Map<String, dynamic>;
-      } else {
-        _stockError = 'Failed to load stock summary (${response.statusCode})';
-      }
-    } catch (e) {
-      _stockError = 'Connection error: $e';
-    }
-
-    _isStockLoading = false;
-    notifyListeners();
-  }
-
-  Future<void> fetchCustomerSales(String customerId, String from, String to) async {
-    _customerSalesData = null;
-    _isCustomerSalesLoading = true;
-    _customerSalesError = null;
-    notifyListeners();
-
-    try {
-      final response = await _apiService.get(
-        ApiConstants.customerSalesUrl,
-        queryParams: {
-          'customer_id': customerId,
-          'from': from,
-          'to': to,
-        },
-      );
-      if (response.statusCode == 200) {
-        _customerSalesData = jsonDecode(response.body) as Map<String, dynamic>;
-      } else {
-        _customerSalesError = 'Failed to load customer sales (${response.statusCode})';
-      }
-    } catch (e) {
-      _customerSalesError = 'Connection error: $e';
-    }
-
-    _isCustomerSalesLoading = false;
     notifyListeners();
   }
 }

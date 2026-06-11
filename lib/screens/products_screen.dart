@@ -1134,13 +1134,6 @@ class AppDrawer extends StatelessWidget {
               Navigator.pushReplacementNamed(context, '/ledger');
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.bar_chart_outlined),
-            title: const Text('Reports'),
-            onTap: () {
-              Navigator.pushReplacementNamed(context, '/reports');
-            },
-          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),

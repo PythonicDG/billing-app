@@ -12,6 +12,11 @@ class ApiConstants {
   // Dashboard
   static const String dashboardSummaryUrl = '/api/dashboard/summary/';
 
+  // Reports
+  static const String reportCustomersUrl = '/api/reports/customers/';
+  static const String reportAnalyticsUrl = '/api/reports/analytics/';
+  static const String reportOperationsUrl = '/api/reports/operations/';
+
   static String invoiceDetailUrl(String id) => '/api/billing/invoices/$id/';
   static String invoiceDownloadPdfUrl(String id) => '/api/billing/invoices/$id/download_pdf/';
   static String invoicePrintHtmlUrl(String id) => '/api/billing/invoices/$id/print_html/';

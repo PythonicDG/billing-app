@@ -1061,7 +1061,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         final customerName = bill['customer_details']?['name'] ?? 'Unknown Customer';
                         final amount = double.tryParse(bill['grand_total'].toString()) ?? 0.0;
                         final dateStr = bill['created_at'] != null 
-                          ? DateFormat('dd MMM, hh:mm a').format(DateTime.parse(bill['created_at']))
+                          ? DateFormat('dd MMM, hh:mm a').format(DateTime.parse(bill['created_at']).toLocal())
                           : 'Unknown Date';
                         
                         return Row(
@@ -1104,6 +1104,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   currencyFormat.format(amount),
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
                                 ),
+                                if (bill['payment_status'] == 'PARTIAL' || bill['payment_status'] == 'UNPAID') ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Paid: ${currencyFormat.format(double.tryParse(bill['paid_amount'].toString()) ?? 0.0)}',
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFF16A34A), fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    'Due: ${currencyFormat.format(double.tryParse(bill['due_amount'].toString()) ?? 0.0)}',
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFFDC2626), fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                                 const SizedBox(height: 8),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,

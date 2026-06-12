@@ -184,14 +184,40 @@ class _BillingScreenState extends State<BillingScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF1F5F9),
         appBar: AppBar(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.bolt, color: Color(0xFF2563EB)), // Changed from Amber to Primary Blue
-              SizedBox(width: 8),
+              const Icon(Icons.bolt, color: Color(0xFF2563EB)),
+              const SizedBox(width: 8),
               Text(
-                'Vighnaharta POS Billing',
-                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A)),
+                billingProvider.editingInvoiceId != null ? 'Update Bill' : 'Vighnaharta POS Billing',
+                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A)),
               ),
+              if (billingProvider.editingInvoiceId != null) ...[
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF2563EB)),
+                  ),
+                  child: const Text(
+                    'EDIT MODE',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    billingProvider.clearCart();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Edit mode cancelled. Cart cleared.'))
+                    );
+                  },
+                  icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFEF4444)),
+                  label: const Text('Cancel Edit', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
             ],
           ),
           actions: [
@@ -1303,14 +1329,16 @@ class _BillingScreenState extends State<BillingScreen> {
    // Interactive Payment & Checkout Wizard
   void _showCheckoutWizard(BuildContext context, BillingProvider provider) {
     _paidAmountController.text = provider.grandTotal.toString();
-    _customerNameController.clear();
-    _customerPhoneController.clear();
+    _customerNameController.text = provider.customerName ?? '';
+    _customerPhoneController.text = provider.customerPhone ?? '';
     _paymentMethod = 'CASH';
     double changeAmount = 0.0;
     
     // Auto focus customer name when wizard opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _customerNameFocusNode.requestFocus();
+      if (_customerNameController.text.isEmpty) {
+        _customerNameFocusNode.requestFocus();
+      }
     });
 
     showModalBottomSheet(
@@ -1365,13 +1393,16 @@ class _BillingScreenState extends State<BillingScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.payment_outlined, color: Color(0xFF2563EB)),
-                          SizedBox(width: 8),
-                          Text('Billing Checkout Portal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          Spacer(),
-                          Text('ESC to close', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                          const Icon(Icons.payment_outlined, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 8),
+                          Text(
+                            provider.editingInvoiceId != null ? 'Update Existing Bill' : 'Billing Checkout Portal',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                          const Spacer(),
+                          const Text('ESC to close', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
                         ],
                       ),
                       const Divider(color: Color(0xFFE2E8F0), height: 24),
@@ -1668,7 +1699,10 @@ class _BillingScreenState extends State<BillingScreen> {
                                   ),
                                   onPressed: () => _onConfirmPressed(provider),
                                   icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.white),
-                                  label: const Text('CONFIRM (Ctrl+Ent)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                  label: Text(
+                                    provider.editingInvoiceId != null ? 'UPDATE BILL' : 'CONFIRM (Ctrl+Ent)',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1689,22 +1723,37 @@ class _BillingScreenState extends State<BillingScreen> {
 
   void _onConfirmPressed(BillingProvider provider) async {
     if (_formKey.currentState!.validate()) {
-      final invoiceId = await provider.createInvoice(
-        customerName: _customerNameController.text,
-        customerPhone: _customerPhoneController.text,
-        paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
-        paymentMethod: _paymentMethod,
-      );
-      if (invoiceId != null) {
+      final String? finalInvoiceId;
+      
+      if (provider.editingInvoiceId != null) {
+        finalInvoiceId = await provider.updateInvoice(
+          invoiceId: provider.editingInvoiceId!,
+          customerName: _customerNameController.text,
+          customerPhone: _customerPhoneController.text,
+          paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
+          paymentMethod: _paymentMethod,
+        );
+      } else {
+        finalInvoiceId = await provider.createInvoice(
+          customerName: _customerNameController.text,
+          customerPhone: _customerPhoneController.text,
+          paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
+          paymentMethod: _paymentMethod,
+        );
+      }
+
+      if (finalInvoiceId != null) {
         if (mounted) Navigator.pop(context);
         ScaffoldMessenger.of(context).clearSnackBars();
+        
         final productProvider = Provider.of<ProductProvider>(context, listen: false);
         productProvider.fetchProducts(pageSize: 100);
-        _showSuccessWithDownload(context, provider, invoiceId);
+        
+        _showSuccessWithDownload(context, provider, finalInvoiceId);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Creation Failed: ${provider.errorMessage ?? "Unknown error"}'),
+            content: Text('Operation Failed: ${provider.errorMessage ?? "Unknown error"}'),
             backgroundColor: const Color(0xFFEF4444),
           ),
         );

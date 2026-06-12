@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String baseUrl = 'http://127.0.0.1:8000'; // Local URL
+  static const String baseUrl = 'https://api.vighnahartafataka.chickenkiller.com'; // Production URL (HTTPS)
   static const String loginUrl = '/api/login/';
   static const String productsUrl = '/api/products/';
   static const String frequentProductsUrl = '/api/products/frequent/';
@@ -8,6 +8,9 @@ class ApiConstants {
   static const String invoicesUrl = '/api/billing/invoices/';
   static const String invoicePreviewUrl = '/api/billing/invoices/preview/';
   static const String customersUrl = '/api/customers/';
+  static String customerLedgerUrl(String id) => '/api/customers/$id/ledger/';
+  static String customerBulkPaymentUrl(String id) => '/api/customers/$id/record_bulk_payment/';
+  static String customerDownloadStatementUrl(String id) => '/api/customers/$id/download_statement/';
 
   // Dashboard
   static const String dashboardSummaryUrl = '/api/dashboard/summary/';

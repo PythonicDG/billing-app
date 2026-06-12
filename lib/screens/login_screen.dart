@@ -77,7 +77,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    width: 90,
+                    height: 90,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -89,10 +90,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.local_fire_department_outlined,
-                      size: 64,
-                      color: Color(0xFF2563EB),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'icon.png',
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

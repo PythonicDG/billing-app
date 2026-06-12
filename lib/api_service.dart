@@ -54,6 +54,15 @@ class ApiService {
     return await http.get(uri, headers: headers);
   }
 
+  Future<http.Response> put(String endpoint, Map<String, dynamic> body) async {
+    final headers = await _getHeaders();
+    return await http.put(
+      Uri.parse('${ApiConstants.baseUrl}$endpoint'),
+      headers: headers,
+      body: jsonEncode(body),
+    );
+  }
+
   Future<http.Response> patch(String endpoint, Map<String, dynamic> body) async {
     final headers = await _getHeaders();
     return await http.patch(

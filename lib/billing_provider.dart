@@ -157,10 +157,19 @@ class BillingProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  String? _customerName;
+  String? _customerPhone;
+
+  String? get customerName => _customerName;
+  String? get customerPhone => _customerPhone;
+
   void clearCart() {
     _cart.clear();
     _discountAmount = 0.0;
     _errorMessage = null;
+    _editingInvoiceId = null;
+    _customerName = null;
+    _customerPhone = null;
     notifyListeners();
   }
 
@@ -294,12 +303,12 @@ class BillingProvider with ChangeNotifier {
   Future<String?> getCustomerStatementUrl(String customerId) async {
     final token = await _apiService.getToken();
     if (token == null) return null;
-    return '${ApiConstants.baseUrl}/api/customers/$customerId/download_statement/?token=$token';
+    return '${ApiConstants.baseUrl}${ApiConstants.customerDownloadStatementUrl(customerId)}?token=$token';
   }
 
   Future<Uint8List?> getCustomerStatementBytes(String customerId) async {
     try {
-      final response = await _apiService.get('/api/customers/$customerId/download_statement/');
+      final response = await _apiService.get(ApiConstants.customerDownloadStatementUrl(customerId));
       if (response.statusCode == 200) {
         return response.bodyBytes;
       }
@@ -337,7 +346,7 @@ class BillingProvider with ChangeNotifier {
   Future<Map<String, dynamic>?> getCustomerLedger(String customerId, {int page = 1}) async {
     try {
       final response = await _apiService.get(
-        '/api/customers/$customerId/ledger/',
+        ApiConstants.customerLedgerUrl(customerId),
         queryParams: {'page': page.toString()},
       );
       if (response.statusCode == 200) {
@@ -352,7 +361,7 @@ class BillingProvider with ChangeNotifier {
   Future<Map<String, dynamic>?> getAllTransactions({int page = 1}) async {
     try {
       final response = await _apiService.get(
-        '/api/invoices/all_transactions/',
+        '${ApiConstants.invoicesUrl}all_transactions/',
         queryParams: {'page': page.toString()},
       );
       if (response.statusCode == 200) {
@@ -367,7 +376,7 @@ class BillingProvider with ChangeNotifier {
   Future<bool> recordPayment(String invoiceId, double amount, String mode, String notes) async {
     try {
       final response = await _apiService.post(
-        '/api/billing/invoices/$invoiceId/payments/',
+        '${ApiConstants.invoiceDetailUrl(invoiceId)}payments/',
         {
           'amount': amount,
           'mode': mode,
@@ -384,7 +393,7 @@ class BillingProvider with ChangeNotifier {
   Future<bool> recordBulkPayment(String customerId, double amount, String mode, String notes) async {
     try {
       final response = await _apiService.post(
-        '/api/customers/$customerId/record_bulk_payment/',
+        ApiConstants.customerBulkPaymentUrl(customerId),
         {
           'amount': amount,
           'mode': mode,
@@ -398,9 +407,113 @@ class BillingProvider with ChangeNotifier {
     return false;
   }
 
+  String? _editingInvoiceId;
+  String? get editingInvoiceId => _editingInvoiceId;
+
+  void setEditingInvoiceId(String? id) {
+    _editingInvoiceId = id;
+    if (id == null) {
+      _discountAmount = 0.0;
+      _taxRate = 0.0;
+    }
+    notifyListeners();
+  }
+
+  Future<Map<String, dynamic>?> getInvoiceDetail(String invoiceId) async {
+    try {
+      final response = await _apiService.get(ApiConstants.invoiceDetailUrl(invoiceId));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('Error fetching invoice detail: $e');
+    }
+    return null;
+  }
+
+  void loadInvoiceIntoCart(Map<String, dynamic> invoiceData, List<Product> availableProducts) {
+    clearCart();
+    _editingInvoiceId = invoiceData['id'].toString();
+    _customerName = invoiceData['customer_name']?.toString();
+    _customerPhone = invoiceData['customer_phone']?.toString();
+    
+    _discountAmount = double.tryParse(invoiceData['discount_amount']?.toString() ?? '0.0') ?? 0.0;
+    _taxRate = 0.0; // We don't seem to store the rate, but we have tax_amount. 
+    // If tax_amount > 0 and sub_total > 0, we can calculate it.
+    double subTotal = double.tryParse(invoiceData['sub_total']?.toString() ?? '0.0') ?? 0.0;
+    double taxAmount = double.tryParse(invoiceData['tax_amount']?.toString() ?? '0.0') ?? 0.0;
+    if (subTotal > 0) {
+      _taxRate = taxAmount / subTotal;
+    }
+
+    final List itemsData = invoiceData['items'] as List? ?? [];
+    for (var itemData in itemsData) {
+      final String productUuid = itemData['product']?.toString() ?? '';
+      try {
+        final product = availableProducts.firstWhere((p) => p.uuid == productUuid);
+        final item = InvoiceItem(
+          product: product,
+          quantity: int.tryParse(itemData['quantity']?.toString() ?? '1') ?? 1,
+          unitPrice: double.tryParse(itemData['unit_price']?.toString() ?? '0.0') ?? 0.0,
+          unit: itemData['unit']?.toString() ?? 'PIECE',
+        );
+        _cart.add(item);
+      } catch (e) {
+        debugPrint('Product $productUuid not found in available products list.');
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<String?> updateInvoice({
+    required String invoiceId,
+    required String? customerName,
+    required String? customerPhone,
+    required double paidAmount,
+    required String paymentMethod,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final Map<String, dynamic> payload = {
+        'customer_name': customerName,
+        'customer_phone': customerPhone,
+        'sub_total': double.parse(subTotal.toStringAsFixed(2)),
+        'tax_amount': double.parse(taxAmount.toStringAsFixed(2)),
+        'discount_amount': double.parse(_discountAmount.toStringAsFixed(2)),
+        'grand_total': double.parse(grandTotal.toStringAsFixed(2)),
+        'paid_amount': double.parse(paidAmount.toStringAsFixed(2)),
+        'payment_method': paymentMethod,
+        'items': _cart.map((item) => item.toJson()).toList(),
+      };
+
+      final response = await _apiService.put(ApiConstants.invoiceDetailUrl(invoiceId), payload);
+      _isLoading = false;
+
+      if (response.statusCode == 200) {
+        clearCart();
+        _editingInvoiceId = null;
+        notifyListeners();
+        return invoiceId; // Return the invoiceId on success
+      } else {
+        final data = jsonDecode(response.body);
+        _errorMessage = data.toString();
+        notifyListeners();
+        return null;
+      }
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return null;
+    }
+  }
+
   Future<bool> deleteInvoice(String invoiceId) async {
     try {
-      final response = await _apiService.delete('/api/billing/invoices/$invoiceId/');
+      final response = await _apiService.delete(ApiConstants.invoiceDetailUrl(invoiceId));
       return response.statusCode == 204 || response.statusCode == 200;
     } catch (e) {
       debugPrint('Error deleting invoice: $e');

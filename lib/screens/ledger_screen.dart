@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:printing/printing.dart';
 import '../billing_provider.dart';
+import '../product_provider.dart';
 import '../dashboard_provider.dart';
 import '../widgets/app_drawer.dart';
 
@@ -1416,6 +1417,17 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                           final printUrl = '\$url&autoprint=true';
                                                           _launchInvoiceUrl(context, printUrl, inApp: false);
                                                         }
+                                                      } else if (value == 'edit') {
+                                                        final invoiceData = await provider.getInvoiceDetail(invoiceId);
+                                                        if (invoiceData != null && context.mounted) {
+                                                          final productProvider = Provider.of<ProductProvider>(context, listen: false);
+                                                          // Ensure billing products are loaded
+                                                          if (productProvider.billingProducts.isEmpty) {
+                                                            await productProvider.fetchProductsForBilling(pageSize: 500);
+                                                          }
+                                                          provider.loadInvoiceIntoCart(invoiceData, productProvider.billingProducts);
+                                                          Navigator.pushReplacementNamed(context, '/billing');
+                                                        }
                                                       } else if (value == 'delete') {
                                                         if (context.mounted) {
                                                           _showDeleteConfirmationDialog(context, invoiceId, bill['invoice_number'].toString());
@@ -1453,6 +1465,17 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                             Icon(Icons.print_outlined, size: 16, color: Color(0xFF64748B)),
                                                             SizedBox(width: 8),
                                                             Text('Print', style: TextStyle(fontSize: 12)),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const PopupMenuItem<String>(
+                                                        value: 'edit',
+                                                        height: 36,
+                                                        child: Row(
+                                                          children: [
+                                                            Icon(Icons.edit_outlined, size: 16, color: Color(0xFF2563EB)),
+                                                            SizedBox(width: 8),
+                                                            Text('Edit', style: TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
                                                           ],
                                                         ),
                                                       ),

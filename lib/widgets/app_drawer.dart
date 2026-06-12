@@ -7,59 +7,229 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentRoute = ModalRoute.of(context)?.settings.name;
+
     return Drawer(
       backgroundColor: Colors.white,
-      child: ListView(
+      elevation: 0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
+      child: Column(
         children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Color(0xFF2563EB)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          _buildHeader(),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
-                Icon(Icons.local_fire_department_outlined, size: 48, color: Colors.white),
-                SizedBox(height: 16),
-                Text('Vighnaharta Fataka', style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
-                Text('Manager Dashboard', style: TextStyle(color: Colors.white70)),
+                _buildSectionHeader('MAIN MENU'),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.dashboard_outlined,
+                  label: 'Dashboard',
+                  route: '/dashboard',
+                  isActive: currentRoute == '/dashboard' || currentRoute == '/',
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.receipt_long_outlined,
+                  label: 'Billing',
+                  route: '/billing',
+                  isActive: currentRoute == '/billing',
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Inventory',
+                  route: '/inventory',
+                  isActive: currentRoute == '/inventory',
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.account_balance_outlined,
+                  label: 'Ledgers',
+                  route: '/ledger',
+                  isActive: currentRoute == '/ledger',
+                ),
+                const SizedBox(height: 20),
+                _buildSectionHeader('SYSTEM'),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.logout_rounded,
+                  label: 'Logout',
+                  onTap: () {
+                    Provider.of<AuthProvider>(context, listen: false).logout();
+                    Navigator.pushReplacementNamed(context, '/login');
+                  },
+                  isDestructive: true,
+                ),
               ],
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.dashboard_outlined),
-            title: const Text('Dashboard'),
-            onTap: () {
-              Navigator.pushReplacementNamed(context, '/dashboard');
-            },
+          _buildFooter(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'icon.png',
+                fit: BoxFit.cover,
+              ),
+            ),
           ),
-          ListTile(
-            leading: const Icon(Icons.receipt_long),
-            title: const Text('Billing'),
-            onTap: () {
-              Navigator.pushReplacementNamed(context, '/billing');
-            },
+          const SizedBox(width: 12),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Vighnaharta',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.5,
+                ),
+              ),
+              Text(
+                'Fataka Manager',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.inventory),
-            title: const Text('Inventory'),
-            onTap: () {
-              Navigator.pushReplacementNamed(context, '/inventory');
-            },
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF94A3B8),
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    String? route,
+    VoidCallback? onTap,
+    bool isActive = false,
+    bool isDestructive = false,
+  }) {
+    final activeColor = isDestructive ? const Color(0xFFEF4444) : const Color(0xFF2563EB);
+    final inactiveColor = const Color(0xFF64748B);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        color: isActive ? activeColor.withOpacity(0.08) : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: ListTile(
+        onTap: onTap ?? () {
+          if (route != null) {
+            Navigator.pushReplacementNamed(context, route);
+          }
+        },
+        leading: Icon(
+          icon,
+          color: isActive ? activeColor : inactiveColor,
+          size: 22,
+        ),
+        title: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? activeColor : (isDestructive ? const Color(0xFFEF4444).withOpacity(0.8) : const Color(0xFF1E293B)),
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+            fontSize: 14,
           ),
-          ListTile(
-            leading: const Icon(Icons.account_balance_outlined),
-            title: const Text('Ledgers'),
-            onTap: () {
-              Navigator.pushReplacementNamed(context, '/ledger');
-            },
+        ),
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 16,
+            backgroundColor: Color(0xFFF1F5F9),
+            child: Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)),
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Logout'),
-            onTap: () {
-              Provider.of<AuthProvider>(context, listen: false).logout();
-              Navigator.pushReplacementNamed(context, '/login');
-            },
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Admin User',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  'v1.2.0',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
           ),
+          Icon(Icons.settings_outlined, size: 18, color: const Color(0xFF64748B).withOpacity(0.5)),
         ],
       ),
     );

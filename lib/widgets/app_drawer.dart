@@ -55,6 +55,13 @@ class AppDrawer extends StatelessWidget {
                 _buildSectionHeader('SYSTEM'),
                 _buildDrawerItem(
                   context,
+                  icon: Icons.settings_outlined,
+                  label: 'Settings',
+                  route: '/settings',
+                  isActive: currentRoute == '/settings',
+                ),
+                _buildDrawerItem(
+                  context,
                   icon: Icons.logout_rounded,
                   label: 'Logout',
                   onTap: () {
@@ -66,7 +73,7 @@ class AppDrawer extends StatelessWidget {
               ],
             ),
           ),
-          _buildFooter(),
+          _buildFooter(context),
         ],
       ),
     );
@@ -192,45 +199,55 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
       ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 16,
-            backgroundColor: Color(0xFFF1F5F9),
-            child: Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Admin User',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F172A),
-                  ),
+      child: InkWell(
+        onTap: () {
+          Navigator.pop(context); // Close drawer
+          Navigator.pushNamed(context, '/settings');
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              const CircleAvatar(
+                radius: 16,
+                backgroundColor: Color(0xFFF1F5F9),
+                child: Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Admin User',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'v1.0.0',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  'v1.2.0',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF94A3B8),
-                  ),
-                ),
-              ],
-            ),
+              ),
+              Icon(Icons.settings_outlined, size: 18, color: const Color(0xFF64748B).withOpacity(0.5)),
+            ],
           ),
-          Icon(Icons.settings_outlined, size: 18, color: const Color(0xFF64748B).withOpacity(0.5)),
-        ],
+        ),
       ),
     );
   }

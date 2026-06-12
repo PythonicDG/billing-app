@@ -291,7 +291,7 @@ class ProductProvider with ChangeNotifier {
       final Map<String, String> params = {
         'search': _billingSearchQuery,
         'page_size': pageSize.toString(),
-        'stock_filter': 'all', // Billing should always show all products regardless of inventory filters
+        'stock_filter': 'available', // Billing should hide out-of-stock products
       };
 
       final response = await _apiService.get(

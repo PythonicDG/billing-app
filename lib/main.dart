@@ -13,6 +13,8 @@ import 'screens/dashboard_screen.dart';
 import 'screens/products_screen.dart';
 import 'screens/billing_screen.dart';
 import 'screens/ledger_screen.dart';
+import 'screens/settings_screen.dart';
+import 'settings_provider.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -31,6 +33,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => BillingProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: const VighnahartaApp(),
     ),
@@ -69,6 +72,7 @@ class _VighnahartaAppState extends State<VighnahartaApp> {
         navigatorKey: _navigatorKey,
         title: 'Vighnaharta Fataka',
         theme: AppTheme.lightTheme,
+        debugShowCheckedModeBanner: false,
         home: authProvider.isAuthenticated 
             ? const DashboardScreen() 
             : const LoginScreen(),
@@ -78,6 +82,7 @@ class _VighnahartaAppState extends State<VighnahartaApp> {
           '/inventory': (context) => const ProductsScreen(),
           '/billing': (context) => const BillingScreen(),
           '/ledger': (context) => const LedgerScreen(),
+          '/settings': (context) => const SettingsScreen(),
         },
       ),
     );

@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../billing_provider.dart';
 import '../product_provider.dart';
+import '../settings_provider.dart';
 import '../auth_provider.dart';
 import '../dashboard_provider.dart';
 import '../widgets/app_drawer.dart';
@@ -183,9 +184,14 @@ class _BillingScreenState extends State<BillingScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     // Apply dynamic filtering locally over loaded products
+    final settingsProvider = Provider.of<SettingsProvider>(context);
     final String searchQuery = _searchController.text.toLowerCase();
     List<Product> displayedProducts = productProvider.billingProducts.where((p) {
-      return p.name.toLowerCase().contains(searchQuery);
+      final matchesSearch = p.name.toLowerCase().contains(searchQuery);
+      if (settingsProvider.hideOutOfStock) {
+        return matchesSearch && p.stockQuantity > 0;
+      }
+      return matchesSearch;
     }).toList();
 
     double screenWidth = MediaQuery.of(context).size.width;
@@ -1781,7 +1787,13 @@ class _BillingScreenState extends State<BillingScreen> {
         ScaffoldMessenger.of(context).clearSnackBars();
         
         final productProvider = Provider.of<ProductProvider>(context, listen: false);
+        productProvider.fetchProductsForBilling(pageSize: 100);
         productProvider.fetchProducts(pageSize: 100);
+        productProvider.fetchFrequentProducts();
+        productProvider.fetchInventoryAnalytics();
+        
+        final dashboardProvider = Provider.of<DashboardProvider>(context, listen: false);
+        dashboardProvider.fetchDashboardSummary();
         
         _showSuccessWithDownload(context, provider, finalInvoiceId);
       } else {

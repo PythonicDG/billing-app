@@ -438,19 +438,32 @@ class BillingProvider with ChangeNotifier {
     _customerPhone = invoiceData['customer_phone']?.toString();
     
     _discountAmount = double.tryParse(invoiceData['discount_amount']?.toString() ?? '0.0') ?? 0.0;
-    _taxRate = 0.0; // We don't seem to store the rate, but we have tax_amount. 
-    // If tax_amount > 0 and sub_total > 0, we can calculate it.
-    double subTotal = double.tryParse(invoiceData['sub_total']?.toString() ?? '0.0') ?? 0.0;
-    double taxAmount = double.tryParse(invoiceData['tax_amount']?.toString() ?? '0.0') ?? 0.0;
-    if (subTotal > 0) {
-      _taxRate = taxAmount / subTotal;
+    _taxRate = 0.0; 
+    double subTotalVal = double.tryParse(invoiceData['sub_total']?.toString() ?? '0.0') ?? 0.0;
+    double taxAmountVal = double.tryParse(invoiceData['tax_amount']?.toString() ?? '0.0') ?? 0.0;
+    if (subTotalVal > 0) {
+      _taxRate = taxAmountVal / subTotalVal;
     }
 
     final List itemsData = invoiceData['items'] as List? ?? [];
     for (var itemData in itemsData) {
-      final String productUuid = itemData['product']?.toString() ?? '';
-      try {
-        final product = availableProducts.firstWhere((p) => p.uuid == productUuid);
+      final dynamic productData = itemData['product'];
+      Product? product;
+
+      if (productData is Map<String, dynamic>) {
+        // Use nested product data if available (robust)
+        product = Product.fromJson(productData);
+      } else {
+        // Fallback to searching in availableProducts list
+        final String productUuid = productData?.toString() ?? '';
+        try {
+          product = availableProducts.firstWhere((p) => p.uuid == productUuid);
+        } catch (e) {
+          debugPrint('Product $productUuid not found in available products list.');
+        }
+      }
+
+      if (product != null) {
         final item = InvoiceItem(
           product: product,
           quantity: int.tryParse(itemData['quantity']?.toString() ?? '1') ?? 1,
@@ -458,8 +471,6 @@ class BillingProvider with ChangeNotifier {
           unit: itemData['unit']?.toString() ?? 'PIECE',
         );
         _cart.add(item);
-      } catch (e) {
-        debugPrint('Product $productUuid not found in available products list.');
       }
     }
     notifyListeners();

@@ -1421,10 +1421,13 @@ class _LedgerScreenState extends State<LedgerScreen> {
                                                         final invoiceData = await provider.getInvoiceDetail(invoiceId);
                                                         if (invoiceData != null && context.mounted) {
                                                           final productProvider = Provider.of<ProductProvider>(context, listen: false);
-                                                          // Ensure billing products are loaded
-                                                          if (productProvider.billingProducts.isEmpty) {
-                                                            await productProvider.fetchProductsForBilling(pageSize: 500);
-                                                          }
+                                                          
+                                                          // Always ensure we have a fresh list of products without any previous search filters
+                                                          // to maximize chances of finding the items in the invoice locally (fallback).
+                                                          // Our recent backend update now also sends full product data in invoice detail,
+                                                          // making this even more robust.
+                                                          await productProvider.fetchProductsForBilling(search: '', pageSize: 500);
+                                                          
                                                           provider.loadInvoiceIntoCart(invoiceData, productProvider.billingProducts);
                                                           Navigator.pushReplacementNamed(context, '/billing');
                                                         }

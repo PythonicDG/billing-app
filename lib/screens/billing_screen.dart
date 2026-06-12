@@ -47,6 +47,7 @@ class _BillingScreenState extends State<BillingScreen> {
   // Pagination State
   int _currentPage = 1;
   static const int _itemsPerPage = 12;
+  int _highlightedIndex = 0;
 
   // For POS calculations
   final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: 'Rs.');
@@ -54,6 +55,22 @@ class _BillingScreenState extends State<BillingScreen> {
   @override
   void initState() {
     super.initState();
+    _searchFocusNode.onKeyEvent = (node, event) {
+      if (event is KeyDownEvent) {
+        if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+          setState(() {
+            _highlightedIndex++;
+          });
+          return KeyEventResult.handled;
+        } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+          setState(() {
+            _highlightedIndex = _highlightedIndex > 0 ? _highlightedIndex - 1 : 0;
+          });
+          return KeyEventResult.handled;
+        }
+      }
+      return KeyEventResult.ignored;
+    };
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final productProvider = Provider.of<ProductProvider>(context, listen: false);
       productProvider.fetchProductsForBilling(pageSize: 100);
@@ -409,6 +426,13 @@ class _BillingScreenState extends State<BillingScreen> {
             endIndex > totalItems ? totalItems : endIndex,
           );
 
+    // Safety check for highlighted index
+    if (_highlightedIndex >= paginatedProducts.length && paginatedProducts.isNotEmpty) {
+      _highlightedIndex = paginatedProducts.length - 1;
+    } else if (paginatedProducts.isEmpty) {
+      _highlightedIndex = 0;
+    }
+
     return Column(
       children: [
         // Modern search input and filter buttons
@@ -438,6 +462,7 @@ class _BillingScreenState extends State<BillingScreen> {
                                 productProvider.setBillingSearch('');
                                 setState(() {
                                   _currentPage = 1;
+                                  _highlightedIndex = 0;
                                 });
                               },
                             )
@@ -461,6 +486,7 @@ class _BillingScreenState extends State<BillingScreen> {
                     onChanged: (v) {
                        setState(() {
                          _currentPage = 1;
+                         _highlightedIndex = 0;
                        });
                        if (_debounce?.isActive ?? false) _debounce!.cancel();
                        _debounce = Timer(const Duration(milliseconds: 250), () {
@@ -474,9 +500,9 @@ class _BillingScreenState extends State<BillingScreen> {
                          _currentPage = 1;
                        });
                        
-                       // KEYBOARD OPTIMIZATION: If results found, add the first one and focus its Qty
+                       // KEYBOARD OPTIMIZATION: If results found, add the HIGHLIGHTED one and focus its Qty
                        if (paginatedProducts.isNotEmpty) {
-                         final product = paginatedProducts.first;
+                         final product = paginatedProducts[_highlightedIndex.clamp(0, paginatedProducts.length - 1)];
                          final unit = _tempUnits[product.uuid] ?? 'CENT';
                          billingProvider.addToCart(product, unit: unit);
                          
@@ -529,7 +555,11 @@ class _BillingScreenState extends State<BillingScreen> {
                         final product = paginatedProducts[index];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: _buildECommerceProductCard(product, billingProvider),
+                          child: _buildECommerceProductCard(
+                            product, 
+                            billingProvider,
+                            isHighlighted: index == _highlightedIndex,
+                          ),
                         );
                       },
                     ),
@@ -556,6 +586,7 @@ class _BillingScreenState extends State<BillingScreen> {
                           ? () {
                               setState(() {
                                 _currentPage = 1;
+                                _highlightedIndex = 0;
                               });
                             }
                           : null,
@@ -594,6 +625,7 @@ class _BillingScreenState extends State<BillingScreen> {
                           ? () {
                               setState(() {
                                 _currentPage--;
+                                _highlightedIndex = 0;
                               });
                             }
                           : null,
@@ -738,6 +770,7 @@ class _BillingScreenState extends State<BillingScreen> {
                           ? () {
                               setState(() {
                                 _currentPage++;
+                                _highlightedIndex = 0;
                               });
                             }
                           : null,
@@ -776,6 +809,7 @@ class _BillingScreenState extends State<BillingScreen> {
                           ? () {
                               setState(() {
                                 _currentPage = totalPages;
+                                _highlightedIndex = 0;
                               });
                             }
                           : null,
@@ -817,7 +851,7 @@ class _BillingScreenState extends State<BillingScreen> {
   }
 
   // Beautiful Amazon/Flipkart style Product Grid Card
-  Widget _buildECommerceProductCard(Product product, BillingProvider billingProvider) {
+  Widget _buildECommerceProductCard(Product product, BillingProvider billingProvider, {bool isHighlighted = false}) {
     final isInCart = billingProvider.cart.any((item) => item.product.uuid == product.uuid);
     final cartItem = isInCart ? billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid) : null;
     
@@ -829,15 +863,15 @@ class _BillingScreenState extends State<BillingScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isHighlighted ? const Color(0xFFEFF6FF) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isInCart ? const Color(0xFF2563EB).withOpacity(0.5) : const Color(0xFFE2E8F0),
-          width: isInCart ? 1.5 : 1,
+          color: isHighlighted ? const Color(0xFF2563EB) : (isInCart ? const Color(0xFF2563EB).withOpacity(0.5) : const Color(0xFFE2E8F0)),
+          width: isHighlighted ? 1.5 : (isInCart ? 1.5 : 1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: isHighlighted ? const Color(0xFF2563EB).withOpacity(0.1) : Colors.black.withOpacity(0.02),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),

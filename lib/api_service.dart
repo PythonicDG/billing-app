@@ -3,9 +3,14 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'constants.dart';
 
 class ApiService {
+  static const _secureStorage = FlutterSecureStorage();
+
+  // --- Auth Token (user login) ---
+
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');
@@ -21,7 +26,31 @@ class ApiService {
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    // Also clear dashboard token from secure storage
+    await clearDashboardToken();
   }
+
+  // --- Dashboard Access Token (secure storage) ---
+
+  Future<String?> getDashboardToken() async {
+    return await _secureStorage.read(key: 'dashboard_token');
+  }
+
+  Future<String?> getDashboardTokenExpiry() async {
+    return await _secureStorage.read(key: 'dashboard_token_expires_at');
+  }
+
+  Future<void> saveDashboardToken(String token, String expiresAt) async {
+    await _secureStorage.write(key: 'dashboard_token', value: token);
+    await _secureStorage.write(key: 'dashboard_token_expires_at', value: expiresAt);
+  }
+
+  Future<void> clearDashboardToken() async {
+    await _secureStorage.delete(key: 'dashboard_token');
+    await _secureStorage.delete(key: 'dashboard_token_expires_at');
+  }
+
+  // --- HTTP Headers ---
 
   Future<Map<String, String>> _getHeaders() async {
     final token = await getToken();
@@ -30,6 +59,17 @@ class ApiService {
       if (token != null) 'Authorization': 'Token $token',
     };
   }
+
+  Future<Map<String, String>> _getDashboardHeaders() async {
+    final headers = await _getHeaders();
+    final dashToken = await getDashboardToken();
+    if (dashToken != null) {
+      headers['X-Dashboard-Token'] = dashToken;
+    }
+    return headers;
+  }
+
+  // --- Standard HTTP Methods ---
 
   Future<http.Response> post(String endpoint, Map<String, dynamic> body) async {
     final headers = await _getHeaders();
@@ -79,6 +119,23 @@ class ApiService {
       headers: headers,
     );
   }
+
+  // --- Dashboard-specific HTTP Methods (includes X-Dashboard-Token) ---
+
+  Future<http.Response> dashboardGet(String endpoint, {Map<String, String>? queryParams}) async {
+    final headers = await _getDashboardHeaders();
+    
+    Uri uri;
+    if (endpoint.startsWith('http')) {
+      uri = Uri.parse(endpoint);
+    } else {
+      uri = Uri.parse('${ApiConstants.baseUrl}$endpoint').replace(queryParameters: queryParams);
+    }
+        
+    return await http.get(uri, headers: headers);
+  }
+
+  // --- Multipart ---
 
   Future<http.Response> multipartRequest({
     required String method,

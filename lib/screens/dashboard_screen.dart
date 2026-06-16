@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import '../dashboard_provider.dart';
 import '../auth_provider.dart';
 import '../billing_provider.dart';
+import '../dashboard_pin_provider.dart';
 import '../widgets/app_drawer.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -20,6 +21,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _autoRefreshTimer;
   DateTime? _lastRefreshed;
   final currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: 'Rs.');
+  bool _initialLoadDone = false;
+  final TextEditingController _pinController = TextEditingController();
 
   // Local pagination state for stock status alerts
   int _stockCurrentPage = 1;
@@ -28,16 +31,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDashboard();
-    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
-      _loadDashboard();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<DashboardPinProvider>(context, listen: false).checkPinStatus();
     });
   }
 
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _pinController.dispose();
+    
+    // Revoke access when leaving the dashboard screen (e.g., switching tabs)
+    // We use Future.microtask to avoid calling notifyListeners during dispose.
+    final pinProvider = Provider.of<DashboardPinProvider>(context, listen: false);
+    Future.microtask(() => pinProvider.revokeAccess());
+    
     super.dispose();
+  }
+
+  /// Start fetching data and the auto-refresh timer.
+  /// Called once after we confirm no password is needed, or after successful auth.
+  void _startDashboardLoading() {
+    if (_initialLoadDone) return;
+    _initialLoadDone = true;
+    _loadDashboard();
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _loadDashboard();
+    });
   }
 
   void _loadDashboard({String? range}) {
@@ -67,9 +87,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
     final dashProvider = Provider.of<DashboardProvider>(context);
+    final pinProvider = Provider.of<DashboardPinProvider>(context);
     final data = dashProvider.dashboardData;
+
+    // Wait until PIN status is loaded
+    if (!pinProvider.isStatusLoaded) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF1F5F9),
+        appBar: AppBar(
+          title: Row(
+            children: [
+              const Icon(Icons.dashboard_outlined, color: Color(0xFF2563EB)),
+              const SizedBox(width: 8),
+              const Text(
+                'Dashboard',
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+        ),
+        drawer: const AppDrawer(),
+        body: const Center(
+          child: CircularProgressIndicator(color: Color(0xFF2563EB)),
+        ),
+      );
+    }
+
+    final bool isVerified = pinProvider.isVerified;
+
+    // Handle auto-revocation if the API says access is denied (session expired)
+    if (dashProvider.dashboardAccessDenied && isVerified) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        pinProvider.revokeAccess();
+        dashProvider.clearDashboardData(); // clears the access denied flag
+      });
+    }
+
+    // If verified (or no PIN needed), start loading data
+    if (isVerified && !dashProvider.dashboardAccessDenied) {
+      _startDashboardLoading();
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -83,7 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, color: Color(0xFF0F172A)),
             ),
             const Spacer(),
-            if (_lastRefreshed != null)
+            if (_lastRefreshed != null && isVerified)
               Text(
                 'Updated ${DateFormat('hh:mm a').format(_lastRefreshed!)}',
                 style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
@@ -91,21 +151,121 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: dashProvider.isDashboardLoading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)))
-                : const Icon(Icons.refresh_outlined, color: Color(0xFF2563EB)),
-            tooltip: 'Refresh',
-            onPressed: dashProvider.isDashboardLoading ? null : _loadDashboard,
-          ),
+          if (isVerified)
+            IconButton(
+              icon: dashProvider.isDashboardLoading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)))
+                  : const Icon(Icons.refresh_outlined, color: Color(0xFF2563EB)),
+              tooltip: 'Refresh',
+              onPressed: dashProvider.isDashboardLoading ? null : _loadDashboard,
+            ),
           const SizedBox(width: 8),
         ],
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
       drawer: const AppDrawer(),
-      body: _buildBody(dashProvider, data),
+      body: (!isVerified || dashProvider.dashboardAccessDenied) 
+          ? _buildPinPrompt(pinProvider) 
+          : _buildBody(dashProvider, data),
     );
+  }
+
+  Widget _buildPinPrompt(DashboardPinProvider provider) {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        padding: const EdgeInsets.all(24),
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.lock_outline_rounded, size: 48, color: Color(0xFF2563EB)),
+            const SizedBox(height: 16),
+            const Text(
+              'Dashboard Protected',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              provider.isLocked 
+                ? 'Too many failed attempts. Locked for ${provider.lockoutRemainingSeconds} seconds.'
+                : 'Please enter your dashboard PIN to continue.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: provider.isLocked ? Colors.red : const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _pinController,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              enabled: !provider.isLocked && !provider.isLoading,
+              onChanged: (_) => provider.clearError(),
+              decoration: InputDecoration(
+                hintText: 'Enter 4-6 digit PIN',
+                errorText: provider.errorMessage,
+                counterText: '',
+                prefixIcon: const Icon(Icons.dialpad_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+              ),
+              onSubmitted: (_) => _submitPin(provider),
+            ),
+            if (provider.attemptsRemaining < 5 && !provider.isLocked && provider.errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  'Attempts remaining: ${provider.attemptsRemaining}',
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: (provider.isLocked || provider.isLoading) 
+                    ? null 
+                    : () => _submitPin(provider),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: provider.isLoading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Access Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitPin(DashboardPinProvider provider) async {
+    final pin = _pinController.text.trim();
+    if (pin.isEmpty) return;
+    
+    final success = await provider.verifyPin(pin);
+    if (success) {
+      _pinController.clear();
+      _startDashboardLoading();
+    }
   }
 
   Widget _buildBody(DashboardProvider provider, Map<String, dynamic>? data) {
@@ -1149,6 +1309,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: TextButton(
                       onPressed: () {
                         Navigator.pop(context);
+                        // Revoke access before navigating away
+                        Provider.of<DashboardPinProvider>(context, listen: false).revokeAccess();
                         Navigator.pushNamed(context, '/ledger');
                       },
                       child: const Text(

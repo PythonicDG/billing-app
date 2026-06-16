@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../auth_provider.dart';
+import 'billing_screen.dart';
 import 'dashboard_screen.dart';
 import 'products_screen.dart';
 
@@ -26,15 +27,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (success) {
         final role = authProvider.role;
-        if (role == 'OWNER') {
+        if (role == 'OWNER' || role == 'STAFF') {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const ProductsScreen()), // Per user request: Dashboard or Products
-          );
-        } else if (role == 'STAFF') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const ProductsScreen()),
+            MaterialPageRoute(builder: (context) => const BillingScreen()),
           );
         } else {
           // VIEWER role or other

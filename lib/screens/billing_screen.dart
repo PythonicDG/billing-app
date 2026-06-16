@@ -1643,6 +1643,30 @@ class _BillingScreenState extends State<BillingScreen> {
                           ],
                         ),
                       ] else if (_paymentMethod == 'UPI') ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _paidAmountController,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                                decoration: const InputDecoration(
+                                  labelText: 'UPI Amount Paid (Rs.)',
+                                  prefixIcon: Icon(Icons.qr_code_outlined),
+                                  filled: true,
+                                  fillColor: Color(0xFFF8FAFC),
+                                ),
+                                onFieldSubmitted: (_) {
+                                  _onConfirmPressed(provider);
+                                },
+                                onChanged: (v) {
+                                  setModalState(() {});
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
                         // Simulated UPI Scan code
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -1701,36 +1725,6 @@ class _BillingScreenState extends State<BillingScreen> {
                           else
                             Row(
                               children: [
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: Color(0xFFE2E8F0)),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  ),
-                                  onPressed: () async {
-                                    if (_formKey.currentState!.validate()) {
-                                      final preview = await provider.previewInvoice(
-                                        customerName: _customerNameController.text,
-                                        customerPhone: _customerPhoneController.text,
-                                        paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
-                                        paymentMethod: _paymentMethod,
-                                      );
-                                      if (preview != null) {
-                                        _showThermalReceiptPreview(context, preview);
-                                      } else {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Preview Failed: ${provider.errorMessage ?? "Unknown error"}'),
-                                            backgroundColor: const Color(0xFFEF4444),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                                  icon: const Icon(Icons.preview_outlined, size: 16, color: Color(0xFF475569)),
-                                  label: const Text('PREVIEW', style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 12)),
-                                ),
-                                const SizedBox(width: 8),
                                 ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF2563EB),
@@ -1770,14 +1764,14 @@ class _BillingScreenState extends State<BillingScreen> {
           invoiceId: provider.editingInvoiceId!,
           customerName: _customerNameController.text,
           customerPhone: _customerPhoneController.text,
-          paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
+          paidAmount: (double.tryParse(_paidAmountController.text) ?? 0.0),
           paymentMethod: _paymentMethod,
         );
       } else {
         finalInvoiceId = await provider.createInvoice(
           customerName: _customerNameController.text,
           customerPhone: _customerPhoneController.text,
-          paidAmount: _paymentMethod == 'CASH' ? (double.tryParse(_paidAmountController.text) ?? 0.0) : provider.grandTotal,
+          paidAmount: (double.tryParse(_paidAmountController.text) ?? 0.0),
           paymentMethod: _paymentMethod,
         );
       }

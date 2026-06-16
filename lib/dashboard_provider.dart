@@ -11,12 +11,14 @@ class DashboardProvider with ChangeNotifier {
   bool _isDashboardLoading = false;
   String? _dashboardError;
   String _dashboardRange = 'today';
+  bool _dashboardAccessDenied = false;
 
   // Getters
   Map<String, dynamic>? get dashboardData => _dashboardData;
   bool get isDashboardLoading => _isDashboardLoading;
   String? get dashboardError => _dashboardError;
   String get dashboardRange => _dashboardRange;
+  bool get dashboardAccessDenied => _dashboardAccessDenied;
 
   void refreshAll() {
     fetchDashboardSummary(range: _dashboardRange);
@@ -30,16 +32,21 @@ class DashboardProvider with ChangeNotifier {
   Future<void> fetchDashboardSummary({String? range}) async {
     _isDashboardLoading = true;
     _dashboardError = null;
-    // We don't necessarily want to clear dashboard data as it's the main screen
+    _dashboardAccessDenied = false;
     notifyListeners();
 
     try {
-      final response = await _apiService.get(
+      // Use dashboardGet which includes the X-Dashboard-Token header
+      final response = await _apiService.dashboardGet(
         ApiConstants.dashboardSummaryUrl,
         queryParams: {'range': range ?? _dashboardRange},
       );
       if (response.statusCode == 200) {
         _dashboardData = jsonDecode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 403) {
+        // Dashboard access denied — token missing or expired
+        _dashboardAccessDenied = true;
+        _dashboardError = 'Dashboard access denied. Please re-enter your PIN.';
       } else {
         _dashboardError = 'Failed to load dashboard (${response.statusCode})';
       }
@@ -48,6 +55,15 @@ class DashboardProvider with ChangeNotifier {
     }
 
     _isDashboardLoading = false;
+    notifyListeners();
+  }
+
+  /// Clear all dashboard data (called on logout or access revocation).
+  void clearDashboardData() {
+    _dashboardData = null;
+    _dashboardError = null;
+    _dashboardAccessDenied = false;
+    _dashboardRange = 'today';
     notifyListeners();
   }
 }

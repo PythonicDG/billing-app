@@ -80,17 +80,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.lock_outline, color: Color(0xFFEF4444)),
                   onTap: () => _showChangePasswordDialog(context),
                 ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                _buildSwitchTile(
-                  'Auto-Logout',
-                  'Lock app when idle for 10 minutes',
-                  false,
-                  (val) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Auto-logout timer updated')),
-                    );
-                  },
-                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -98,33 +87,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'SYSTEM & DATA',
               icon: Icons.settings_applications_outlined,
               children: [
-                ListTile(
-                  title: const Text('Export Data', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Export Inventory and Sales to Excel'),
-                  leading: const Icon(Icons.file_download_outlined, color: Color(0xFF2563EB)),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Exporting to Excel...')),
-                          );
-                        },
-                        child: const Text('EXCEL', style: TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Exporting to CSV...')),
-                          );
-                        },
-                        child: const Text('CSV', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
                 const ListTile(
                   title: Text('App Version', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                   subtitle: Text('v1.0.0'),
@@ -183,17 +145,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 16),
         ],
       ),
-    );
-  }
-
-  Widget _buildSwitchTile(String title, String subtitle, bool value, Function(bool) onChanged) {
-    return SwitchListTile(
-      title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-      value: value,
-      onChanged: onChanged,
-      activeColor: const Color(0xFF2563EB),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
     );
   }
 

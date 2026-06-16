@@ -7,6 +7,7 @@ import 'auth_provider.dart';
 import 'product_provider.dart';
 import 'billing_provider.dart';
 import 'dashboard_provider.dart';
+import 'dashboard_pin_provider.dart';
 import 'theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -33,6 +34,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => BillingProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
+        ChangeNotifierProvider(create: (_) => DashboardPinProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: const VighnahartaApp(),
@@ -74,7 +76,7 @@ class _VighnahartaAppState extends State<VighnahartaApp> {
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
         home: authProvider.isAuthenticated 
-            ? const DashboardScreen() 
+            ? const BillingScreen() 
             : const LoginScreen(),
         routes: {
           '/login': (context) => const LoginScreen(),

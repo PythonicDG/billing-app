@@ -1,6 +1,7 @@
 class ApiConstants {
   static const String baseUrl = 'https://api.vighnahartafataka.chickenkiller.com'; // Production URL (HTTPS)
   static const String loginUrl = '/api/login/';
+  static const String changePasswordUrl = '/api/change-password/';
   static const String productsUrl = '/api/products/';
   static const String frequentProductsUrl = '/api/products/frequent/';
   static const String staffListUrl = '/api/staff/list/';
@@ -14,6 +15,13 @@ class ApiConstants {
 
   // Dashboard
   static const String dashboardSummaryUrl = '/api/dashboard/summary/';
+
+  // Dashboard PIN
+  static const String dashboardPinStatusUrl = '/api/core/dashboard-pin/status/';
+  static const String dashboardPinSetUrl = '/api/core/dashboard-pin/set_pin/';
+  static const String dashboardPinVerifyUrl = '/api/core/dashboard-pin/verify/';
+  static const String dashboardPinRevokeUrl = '/api/core/dashboard-pin/revoke/';
+  static const String dashboardPinRemoveUrl = '/api/core/dashboard-pin/remove_pin/';
 
   static String invoiceDetailUrl(String id) => '/api/billing/invoices/$id/';
   static String invoiceDownloadPdfUrl(String id) => '/api/billing/invoices/$id/download_pdf/';

@@ -135,32 +135,6 @@ class _ProductFormState extends State<ProductForm> {
               ),
               const SizedBox(height: 16),
               
-              // Toggle for Cent/Piece mode (Moved to top)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text("Add by Pieces", style: TextStyle(fontWeight: _isCentMode ? FontWeight.normal : FontWeight.bold)),
-                    Switch(
-                      value: _isCentMode,
-                      onChanged: (value) {
-                        setState(() {
-                          _isCentMode = value;
-                          _updateTotalStock();
-                        });
-                      },
-                    ),
-                    Text("Add by Cents", style: TextStyle(fontWeight: _isCentMode ? FontWeight.bold : FontWeight.normal)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              
               _buildTextField(_nameController, 'Product Name'),
               _buildTextField(_brandController, 'Brand'),
               
@@ -170,6 +144,45 @@ class _ProductFormState extends State<ProductForm> {
                   const SizedBox(width: 8),
                   Expanded(child: _buildTextField(_sellingPriceController, 'Selling Price', isNum: true)),
                 ],
+              ),
+
+              // Unit toggle — pill style, same as billing screen
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Unit',
+                      style: TextStyle(fontSize: 13.5, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      height: 32,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildUnitOption('Unit', !_isCentMode, () {
+                            setState(() {
+                              _isCentMode = false;
+                              _updateTotalStock();
+                            });
+                          }),
+                          _buildUnitOption('Cent (10x)', _isCentMode, () {
+                            setState(() {
+                              _isCentMode = true;
+                              _updateTotalStock();
+                            });
+                          }),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               Row(
                 children: [
@@ -238,6 +251,28 @@ class _ProductFormState extends State<ProductForm> {
     );
   }
 
+
+  Widget _buildUnitOption(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF2563EB) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF64748B),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildTextField(TextEditingController controller, String label, {bool isNum = false, bool isRequired = true}) {
     return Padding(

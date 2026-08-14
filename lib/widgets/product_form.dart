@@ -21,6 +21,7 @@ class _ProductFormState extends State<ProductForm> {
   late TextEditingController _centInPerCsController;
   late TextEditingController _minStockLevelController;
   double _totalStockInCent = 0.0;
+  bool _isCentMode = true; // Default to Cent mode
 
   @override
   void initState() {
@@ -52,9 +53,15 @@ class _ProductFormState extends State<ProductForm> {
 
   void _updateTotalStock() {
     final cases = double.tryParse(_noOfCaseController.text) ?? 0.0;
-    final centPerCs = double.tryParse(_centInPerCsController.text) ?? 0.0;
+    final valPerCs = double.tryParse(_centInPerCsController.text) ?? 0.0;
     setState(() {
-      _totalStockInCent = cases * centPerCs;
+      if (_isCentMode) {
+        // Cent mode: valPerCs is already in cents
+        _totalStockInCent = cases * valPerCs;
+      } else {
+        // Piece mode: valPerCs is in pieces, convert pieces to cents (1 cent = 10 pieces)
+        _totalStockInCent = (cases * valPerCs) / 10.0;
+      }
     });
   }
 
@@ -72,14 +79,18 @@ class _ProductFormState extends State<ProductForm> {
 
   Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
+      final centOrPiecesPerCs = double.tryParse(_centInPerCsController.text) ?? 0.0;
+      final centValue = _isCentMode ? centOrPiecesPerCs : (centOrPiecesPerCs / 10.0);
+      
       final Map<String, dynamic> data = {
         'name': _nameController.text.trim(),
         'brand': _brandController.text.trim(),
         'purchase_price': double.tryParse(_purchasePriceController.text) ?? 0.0,
         'selling_price': double.tryParse(_sellingPriceController.text) ?? 0.0,
         'no_of_case': int.tryParse(_noOfCaseController.text) ?? 0,
-        'cent_in_per_cs': int.tryParse(_centInPerCsController.text) ?? 0,
+        'cent_in_per_cs': centValue,
         'min_stock_level': int.tryParse(_minStockLevelController.text) ?? 5,
+        'entry_mode': _isCentMode ? 'cent' : 'piece',
       };
 
       final provider = Provider.of<ProductProvider>(context, listen: false);
@@ -124,6 +135,32 @@ class _ProductFormState extends State<ProductForm> {
               ),
               const SizedBox(height: 16),
               
+              // Toggle for Cent/Piece mode (Moved to top)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text("Add by Pieces", style: TextStyle(fontWeight: _isCentMode ? FontWeight.normal : FontWeight.bold)),
+                    Switch(
+                      value: _isCentMode,
+                      onChanged: (value) {
+                        setState(() {
+                          _isCentMode = value;
+                          _updateTotalStock();
+                        });
+                      },
+                    ),
+                    Text("Add by Cents", style: TextStyle(fontWeight: _isCentMode ? FontWeight.bold : FontWeight.normal)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              
               _buildTextField(_nameController, 'Product Name'),
               _buildTextField(_brandController, 'Brand'),
               
@@ -138,12 +175,19 @@ class _ProductFormState extends State<ProductForm> {
                 children: [
                   Expanded(child: _buildTextField(_noOfCaseController, 'No. Of Case', isNum: true)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildTextField(_centInPerCsController, 'Cent in per cs', isNum: true)),
+                  // Always show the field, change label
+                  Expanded(
+                    child: _buildTextField(
+                      _centInPerCsController,
+                      _isCentMode ? 'Cent in per cs' : 'Pieces in per cs',
+                      isNum: true,
+                    ),
+                  ),
                 ],
               ),
-              _buildTextField(_minStockLevelController, 'Min Stock Level (cent) — Alert threshold', isNum: true, isRequired: false),
+              _buildTextField(_minStockLevelController, 'Min Stock Level (in cent) — Alert threshold', isNum: true, isRequired: false),
               
-              // Dynamic Display of calculated Total stock in cent
+              // Dynamic Display of calculated Total stock
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16.0),
                 child: Container(
@@ -158,7 +202,7 @@ class _ProductFormState extends State<ProductForm> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Total Stock in Cent:',
+                        'Total Stock (in cent):',
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.bold,
@@ -193,6 +237,7 @@ class _ProductFormState extends State<ProductForm> {
       ),
     );
   }
+
 
   Widget _buildTextField(TextEditingController controller, String label, {bool isNum = false, bool isRequired = true}) {
     return Padding(

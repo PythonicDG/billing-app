@@ -34,8 +34,9 @@ class Product {
   final String? category;
   final String? categoryName;
   final int noOfCase;
-  final int centInPerCs;
+  final double centInPerCs;
   final double totalStockInCent;
+  final String entryMode;
 
   Product({
     required this.uuid,
@@ -53,7 +54,13 @@ class Product {
     required this.noOfCase,
     required this.centInPerCs,
     required this.totalStockInCent,
+    required this.entryMode,
   });
+
+  String formattedPrice(double price) {
+    final unit = entryMode == 'cent' ? 'cent' : 'piece';
+    return 'Rs. ${price.toStringAsFixed(2)} / $unit';
+  }
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
@@ -70,8 +77,9 @@ class Product {
       category: json['category']?.toString(),
       categoryName: json['category_name']?.toString(),
       noOfCase: int.tryParse(json['no_of_case']?.toString() ?? '0') ?? 0,
-      centInPerCs: int.tryParse(json['cent_in_per_cs']?.toString() ?? '0') ?? 0,
+      centInPerCs: double.tryParse(json['cent_in_per_cs']?.toString() ?? '0') ?? 0.0,
       totalStockInCent: double.tryParse(json['total_stock_in_cent']?.toString() ?? '0.0') ?? 0.0,
+      entryMode: json['entry_mode']?.toString() ?? 'cent',
     );
   }
 }

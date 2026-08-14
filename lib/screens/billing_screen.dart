@@ -940,6 +940,10 @@ class _BillingScreenState extends State<BillingScreen> {
                   currencyFormat.format(currentPrice),
                   style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 13),
                 ),
+                Text(
+                  '(${product.formattedPrice(product.sellingPrice)})',
+                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9),
+                ),
               ],
             ),
           ),
@@ -1908,7 +1912,7 @@ class _BillingScreenState extends State<BillingScreen> {
                   final pProvider = Provider.of<ProductProvider>(context, listen: false);
                   final matchingProduct = pProvider.billingProducts.firstWhere(
                     (p) => p.uuid == item['product'],
-                    orElse: () => Product(uuid: '', name: 'Firecracker Item', brand: '', sellingPrice: 0, mrp: 0, purchasePrice: 0, stockQuantity: 0, minStockLevel: 0, noOfCase: 0, centInPerCs: 0, totalStockInCent: 0.0),
+                    orElse: () => Product(uuid: '', name: 'Firecracker Item', brand: '', sellingPrice: 0, mrp: 0, purchasePrice: 0, stockQuantity: 0, minStockLevel: 0, noOfCase: 0, centInPerCs: 0, totalStockInCent: 0.0, entryMode: 'cent'),
                   );
 
                   double totPrice = (double.tryParse(item['quantity']?.toString() ?? '0') ?? 0.0) * (double.tryParse(item['unit_price']?.toString() ?? '0') ?? 0.0);

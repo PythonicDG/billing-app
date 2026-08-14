@@ -474,7 +474,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                         if (isOwner)
                                           DataColumn(label: SizedBox(width: purchaseWidth, child: const Text('PURCHASE PRICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                         DataColumn(label: SizedBox(width: sellingWidth, child: const Text('SELLING PRICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
-                                        DataColumn(label: SizedBox(width: casesWidth, child: const Text('NO. OF CASE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                         DataColumn(label: SizedBox(width: centCsWidth, child: const Text('CENT IN PER CS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                         DataColumn(label: SizedBox(width: stockWidth, child: const Text('TOTAL STOCK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                         DataColumn(label: SizedBox(width: statusWidth, child: const Text('STOCK STATUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
@@ -500,7 +499,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                             if (isOwner)
                                               DataColumn(label: SizedBox(width: purchaseWidth)),
                                             DataColumn(label: SizedBox(width: sellingWidth)),
-                                            DataColumn(label: SizedBox(width: casesWidth)),
                                             DataColumn(label: SizedBox(width: centCsWidth)),
                                             DataColumn(label: SizedBox(width: stockWidth)),
                                             DataColumn(label: SizedBox(width: statusWidth)),
@@ -539,15 +537,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                   ),
                                                 ),
                                                 if (isOwner)
-                                                  DataCell(SizedBox(width: purchaseWidth, child: Text('Rs.${product.purchasePrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12.5)))),
-                                                DataCell(SizedBox(width: sellingWidth, child: Text('Rs.${product.sellingPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB))))),
-                                                DataCell(SizedBox(width: casesWidth, child: Text('${product.noOfCase} cs', style: const TextStyle(fontSize: 12.5)))),
-                                                DataCell(SizedBox(width: centCsWidth, child: Text('${product.centInPerCs} cent', style: const TextStyle(fontSize: 12.5)))),
+                                                  DataCell(SizedBox(width: purchaseWidth, child: Text(product.formattedPrice(product.purchasePrice), style: const TextStyle(fontSize: 12.5)))),
+                                                DataCell(SizedBox(width: sellingWidth, child: Text(product.formattedPrice(product.sellingPrice), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB))))),
+                                                DataCell(SizedBox(width: centCsWidth, child: Text(product.entryMode == 'cent' ? '${product.centInPerCs} cent/cs' : '${(product.centInPerCs * 10).toInt()} pieces/cs', style: const TextStyle(fontSize: 12.5)))),
                                                 DataCell(
                                                   SizedBox(
                                                     width: stockWidth,
                                                     child: Text(
-                                                      '${product.totalStockInCent.toStringAsFixed(1)} cent',
+                                                      product.entryMode == 'cent' ? '${product.totalStockInCent.toStringAsFixed(1)} cent' : '${(product.totalStockInCent * 10).toInt()} pieces',
                                                       style: TextStyle(
                                                         fontWeight: FontWeight.bold,
                                                         fontSize: 12.5,

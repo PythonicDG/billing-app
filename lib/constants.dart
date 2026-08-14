@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String baseUrl = 'https://api.vighnahartafataka.chickenkiller.com'; // Production URL (HTTPS)
+  static const String baseUrl = 'https://billing.sadguruinfinity.com'; // Production URL (HTTPS)
   static const String loginUrl = '/api/login/';
   static const String changePasswordUrl = '/api/change-password/';
   static const String productsUrl = '/api/products/';

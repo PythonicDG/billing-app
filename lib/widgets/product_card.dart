@@ -140,10 +140,16 @@ class ProductCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _infoColumn('NO. OF CASE', '${product.noOfCase} cs'),
-                      _infoColumn('CENT IN PER CS', '${product.centInPerCs} cent'),
+                      _infoColumn(
+                          'CENT/PCS IN PER CS',
+                          product.entryMode == 'cent' 
+                              ? '${product.centInPerCs} cent' 
+                              : '${(product.centInPerCs * 10).toInt()} pieces'),
                       _infoColumn(
                         'TOTAL STOCK',
-                        '${product.totalStockInCent.toStringAsFixed(1)} cent',
+                        product.entryMode == 'cent' 
+                            ? '${product.totalStockInCent.toStringAsFixed(1)} cent' 
+                            : '${(product.totalStockInCent * 10).toInt()} pieces',
                         valueColor: isOutOfStock ? const Color(0xFFEF4444) : const Color(0xFF16A34A),
                         isBold: true,
                       ),

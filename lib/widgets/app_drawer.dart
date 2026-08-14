@@ -172,11 +172,10 @@ class AppDrawer extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2),
-      decoration: BoxDecoration(
+      child: Material(
         color: isActive ? activeColor.withOpacity(0.08) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
-      ),
-      child: ListTile(
+        child: ListTile(
         onTap: onTap ?? () {
           if (route != null) {
             // If we are leaving the dashboard, revoke access to ensure it locks
@@ -204,6 +203,7 @@ class AppDrawer extends StatelessWidget {
         visualDensity: VisualDensity.compact,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
+        ),
         ),
       ),
     );

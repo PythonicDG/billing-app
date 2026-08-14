@@ -54,9 +54,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _startDashboardLoading() {
     if (_initialLoadDone) return;
     _initialLoadDone = true;
-    _loadDashboard();
-    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+    // This can be invoked from build after PIN verification.  Delay the
+    // provider update so listeners are not notified while the widget tree is
+    // being built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _loadDashboard();
+      _autoRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+        _loadDashboard();
+      });
     });
   }
 
@@ -737,13 +743,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
 
           if (totalItems == 0)
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: const BoxDecoration(
@@ -778,8 +783,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-            )
-          else ...[
+          if (totalItems > 0)
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -924,7 +928,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
-          ],
         ],
       ),
     );

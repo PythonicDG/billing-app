@@ -70,7 +70,8 @@ class BillingProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  void addToCart(Product product, {String unit = 'CENT'}) {
+  void addToCart(Product product, {String? unit}) {
+    final defaultUnit = unit ?? (product.entryMode == 'cent' ? 'CENT' : 'PIECE');
     final existingIndex = _cart.indexWhere((item) => item.product.uuid == product.uuid);
     if (existingIndex != -1) {
       final item = _cart[existingIndex];
@@ -81,13 +82,17 @@ class BillingProvider with ChangeNotifier {
         item.quantity++;
       }
     } else {
-      final requestedPieces = unit == 'CENT' ? 10 : 1;
+      final requestedPieces = defaultUnit == 'CENT' ? 10 : 1;
       if (product.stockQuantity >= requestedPieces) {
+        final double calculatedPrice = product.entryMode == 'cent'
+            ? (defaultUnit == 'CENT' ? product.sellingPrice : product.sellingPrice / 10.0)
+            : (defaultUnit == 'CENT' ? product.sellingPrice * 10.0 : product.sellingPrice);
+
         _cart.add(InvoiceItem(
           product: product,
           quantity: 1,
-          unitPrice: unit == 'CENT' ? product.sellingPrice * 10 : product.sellingPrice,
-          unit: unit,
+          unitPrice: double.parse(calculatedPrice.toStringAsFixed(2)),
+          unit: defaultUnit,
         ));
       }
     }
@@ -108,12 +113,18 @@ class BillingProvider with ChangeNotifier {
         // Check if stock is available (1 CENT = 10 PIECES)
         if (item.quantity * 10 <= item.product.stockQuantity) {
           item.unit = 'CENT';
-          item.unitPrice = item.product.sellingPrice * 10;
+          final double price = item.product.entryMode == 'cent'
+              ? item.product.sellingPrice
+              : item.product.sellingPrice * 10.0;
+          item.unitPrice = double.parse(price.toStringAsFixed(2));
         }
       } else {
         // Switch to PIECE
         item.unit = 'PIECE';
-        item.unitPrice = item.product.sellingPrice;
+        final double price = item.product.entryMode == 'cent'
+            ? item.product.sellingPrice / 10.0
+            : item.product.sellingPrice;
+        item.unitPrice = double.parse(price.toStringAsFixed(2));
       }
       notifyListeners();
     }
@@ -326,6 +337,59 @@ class BillingProvider with ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error fetching invoice PDF bytes: $e');
+    }
+    return null;
+  }
+
+  Future<String?> getAllTransactionsPdfUrl({
+    String filterType = 'all',
+    String? date,
+    String? startDate,
+    String? endDate,
+    int? month,
+    int? year,
+    String? paymentStatus,
+  }) async {
+    final token = await _apiService.getToken();
+    if (token == null) return null;
+    final path = ApiConstants.downloadTransactionsPdfUrl(
+      filterType: filterType,
+      date: date,
+      startDate: startDate,
+      endDate: endDate,
+      month: month,
+      year: year,
+      paymentStatus: paymentStatus,
+    );
+    final separator = path.contains('?') ? '&' : '?';
+    return '${ApiConstants.baseUrl}$path${separator}token=$token';
+  }
+
+  Future<Uint8List?> getAllTransactionsPdfBytes({
+    String filterType = 'all',
+    String? date,
+    String? startDate,
+    String? endDate,
+    int? month,
+    int? year,
+    String? paymentStatus,
+  }) async {
+    try {
+      final path = ApiConstants.downloadTransactionsPdfUrl(
+        filterType: filterType,
+        date: date,
+        startDate: startDate,
+        endDate: endDate,
+        month: month,
+        year: year,
+        paymentStatus: paymentStatus,
+      );
+      final response = await _apiService.get(path);
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+    } catch (e) {
+      debugPrint('Error fetching all transactions PDF bytes: $e');
     }
     return null;
   }

@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String baseUrl = 'https://billing.sadguruinfinity.com'; // Production URL (HTTPS)
+  static const String baseUrl = 'https://billing.sadguruinfinity.com'; // Production URL (HTTPS)https://billing.sadguruinfinity.com
   static const String loginUrl = '/api/login/';
   static const String changePasswordUrl = '/api/change-password/';
   static const String productsUrl = '/api/products/';
@@ -29,4 +29,28 @@ class ApiConstants {
   static String invoiceThermalReceiptUrl(String id) => '/api/billing/invoices/$id/thermal_receipt_pdf/';
   static String deactivateStaffUrl(int userId) => '/api/staff/$userId/deactivate/';
   static String productDetailUrl(String uuid) => '/api/products/$uuid/';
+
+  static String downloadTransactionsPdfUrl({
+    String filterType = 'all',
+    String? date,
+    String? startDate,
+    String? endDate,
+    int? month,
+    int? year,
+    String? paymentStatus,
+  }) {
+    final params = <String, String>{
+      'filter_type': filterType,
+    };
+    if (date != null && date.isNotEmpty) params['date'] = date;
+    if (startDate != null && startDate.isNotEmpty) params['start_date'] = startDate;
+    if (endDate != null && endDate.isNotEmpty) params['end_date'] = endDate;
+    if (month != null) params['month'] = month.toString();
+    if (year != null) params['year'] = year.toString();
+    if (paymentStatus != null && paymentStatus.isNotEmpty && paymentStatus != 'ALL') {
+      params['payment_status'] = paymentStatus;
+    }
+    final query = Uri(queryParameters: params).query;
+    return '/api/billing/invoices/download_transactions_pdf/?$query';
+  }
 }

@@ -507,10 +507,10 @@ class _BillingScreenState extends State<BillingScreen> {
                        });
                        
                        // KEYBOARD OPTIMIZATION: If results found, add the HIGHLIGHTED one and focus its Qty
-                       if (paginatedProducts.isNotEmpty) {
-                         final product = paginatedProducts[_highlightedIndex.clamp(0, paginatedProducts.length - 1)];
-                         final unit = _tempUnits[product.uuid] ?? 'CENT';
-                         billingProvider.addToCart(product, unit: unit);
+                        if (paginatedProducts.isNotEmpty) {
+                          final product = paginatedProducts[_highlightedIndex.clamp(0, paginatedProducts.length - 1)];
+                          final unit = _tempUnits[product.uuid] ?? (product.entryMode == 'cent' ? 'CENT' : 'PIECE');
+                          billingProvider.addToCart(product, unit: unit);
                          
                          // Auto focus the quantity field of the added item
                          WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -861,8 +861,10 @@ class _BillingScreenState extends State<BillingScreen> {
     final isInCart = billingProvider.cart.any((item) => item.product.uuid == product.uuid);
     final cartItem = isInCart ? billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid) : null;
     
-    final selectedUnit = isInCart ? cartItem!.unit : (_tempUnits[product.uuid] ?? 'CENT');
-    final currentPrice = selectedUnit == 'CENT' ? product.sellingPrice * 10 : product.sellingPrice;
+    final selectedUnit = isInCart ? cartItem!.unit : (_tempUnits[product.uuid] ?? (product.entryMode == 'cent' ? 'CENT' : 'PIECE'));
+    final currentPrice = product.entryMode == 'cent'
+        ? (selectedUnit == 'CENT' ? product.sellingPrice : product.sellingPrice / 10.0)
+        : (selectedUnit == 'CENT' ? product.sellingPrice * 10.0 : product.sellingPrice);
     
     final isOutOfStock = product.totalStockInCent <= 0;
 
@@ -1149,15 +1151,15 @@ class _BillingScreenState extends State<BillingScreen> {
                                     children: [
                                       // INLINE EDITABLE PRICE TEXTFIELD inside the Checkout list
                                       SizedBox(
-                                        width: 58,
-                                        height: 24,
+                                        width: 90,
+                                        height: 34,
                                         child: Container(
                                           alignment: Alignment.centerLeft,
-                                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFFF8FAFC),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
                                           ),
                                           child: Row(
                                             children: [
@@ -1165,7 +1167,7 @@ class _BillingScreenState extends State<BillingScreen> {
                                                 'Rs.',
                                                 style: TextStyle(
                                                   color: Color(0xFF475569),
-                                                  fontSize: 10,
+                                                  fontSize: 12,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
@@ -1176,12 +1178,12 @@ class _BillingScreenState extends State<BillingScreen> {
                                                   style: const TextStyle(
                                                     color: Color(0xFF0F172A),
                                                     fontWeight: FontWeight.bold,
-                                                    fontSize: 10.5,
+                                                    fontSize: 13,
                                                   ),
                                                   decoration: const InputDecoration(
                                                     border: InputBorder.none,
                                                     isDense: true,
-                                                    contentPadding: EdgeInsets.only(left: 2),
+                                                    contentPadding: EdgeInsets.only(left: 3, bottom: 1),
                                                   ),
                                                   onChanged: (value) {
                                                     if (value.isNotEmpty) {
@@ -1199,18 +1201,18 @@ class _BillingScreenState extends State<BillingScreen> {
                                       ),
                                       const Text(
                                         ' x ',
-                                        style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                                        style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
                                       ),
                                       // INLINE EDITABLE QUANTITY TEXTFIELD inside the Checkout list
                                       SizedBox(
-                                        width: 42,
-                                        height: 24,
+                                        width: 58,
+                                        height: 34,
                                         child: Container(
                                           alignment: Alignment.center,
                                           decoration: BoxDecoration(
                                             color: const Color(0xFFEFF6FF),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3), width: 1),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.4), width: 1.2),
                                           ),
                                           child: TextField(
                                             controller: _getQuantityController(item.product.uuid, item.quantity),
@@ -1219,12 +1221,12 @@ class _BillingScreenState extends State<BillingScreen> {
                                             style: const TextStyle(
                                               color: Color(0xFF2563EB),
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 12,
+                                              fontSize: 14,
                                             ),
                                             decoration: const InputDecoration(
                                               border: InputBorder.none,
                                               isDense: true,
-                                              contentPadding: EdgeInsets.zero,
+                                              contentPadding: EdgeInsets.only(bottom: 1),
                                             ),
                                             onChanged: (value) {
                                               if (value.isNotEmpty) {

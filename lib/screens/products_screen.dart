@@ -507,7 +507,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                           ],
                                           rows: paginatedProducts.map((product) {
                                             final isOutOfStock = product.totalStockInCent <= 0;
-                                            final isLowStock = product.totalStockInCent > 0 && product.totalStockInCent <= product.minStockLevel;
+                                            final isLowStock = product.entryMode == 'piece'
+                                                ? (product.stockQuantity > 0 && product.stockQuantity <= product.minStockLevel)
+                                                : (product.totalStockInCent > 0 && product.totalStockInCent <= product.minStockLevel);
                                             return DataRow(
                                               color: WidgetStateProperty.resolveWith<Color?>((states) {
                                                 if (isOutOfStock) return const Color(0xFFFEF2F2);

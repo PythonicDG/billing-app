@@ -1077,6 +1077,25 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           ),
                         ),
                     ],
+                  )
+                else
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _showTransactionsPdfExportDialog,
+                        icon: const Icon(Icons.picture_as_pdf_rounded, size: 18, color: Colors.white),
+                        label: const Text('DOWNLOAD PDF REPORT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -1861,6 +1880,604 @@ class _LedgerScreenState extends State<LedgerScreen> {
     );
   }
 
+  void _showTransactionsPdfExportDialog() {
+    String filterType = 'day'; // 'day', 'range', 'month', 'all'
+    DateTime selectedDate = DateTime.now();
+    DateTimeRange selectedRange = DateTimeRange(
+      start: DateTime(DateTime.now().year, DateTime.now().month, 1),
+      end: DateTime.now(),
+    );
+    int selectedMonth = DateTime.now().month;
+    int selectedYear = DateTime.now().year;
+    String selectedStatus = 'ALL';
+
+    final List<String> monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    final currentYear = DateTime.now().year;
+    final List<int> years = List.generate(7, (i) => currentYear - 3 + i);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return CallbackShortcuts(
+          bindings: {
+            SingleActivator(LogicalKeyboardKey.escape): () {
+              Navigator.pop(context);
+            },
+          },
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF2563EB), size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Export Transactions PDF',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+                        ),
+                        Text(
+                          'Generate Day-wise, Date range, or Month-wise PDF report',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.normal),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 520,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'SELECT REPORT TYPE',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: Color(0xFF475569)),
+                        ),
+                        const SizedBox(height: 8),
+                        // Filter Mode Segment Selector
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              _buildExportTypeTab('day', 'Day-wise', Icons.today_rounded, filterType == 'day', () {
+                                setDialogState(() => filterType = 'day');
+                              }),
+                              _buildExportTypeTab('range', 'Date to Date', Icons.date_range_rounded, filterType == 'range', () {
+                                setDialogState(() => filterType = 'range');
+                              }),
+                              _buildExportTypeTab('month', 'Month-wise', Icons.calendar_month_rounded, filterType == 'month', () {
+                                setDialogState(() => filterType = 'month');
+                              }),
+                              _buildExportTypeTab('all', 'All Time', Icons.all_inclusive_rounded, filterType == 'all', () {
+                                setDialogState(() => filterType = 'all');
+                              }),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Dynamic Configuration Panel based on active filter
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (filterType == 'day') ...[
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Target Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF334155))),
+                                    Row(
+                                      children: [
+                                        _buildDatePresetChip('Today', () {
+                                          setDialogState(() => selectedDate = DateTime.now());
+                                        }),
+                                        const SizedBox(width: 6),
+                                        _buildDatePresetChip('Yesterday', () {
+                                          setDialogState(() => selectedDate = DateTime.now().subtract(const Duration(days: 1)));
+                                        }),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                InkWell(
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: selectedDate,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2035),
+                                    );
+                                    if (picked != null) {
+                                      setDialogState(() => selectedDate = picked);
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF2563EB)),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            DateFormat('EEEE, dd MMMM yyyy').format(selectedDate),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                          ),
+                                        ),
+                                        const Text('Change', style: TextStyle(color: Color(0xFF2563EB), fontSize: 12, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ] else if (filterType == 'range') ...[
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Date Range', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF334155))),
+                                    Row(
+                                      children: [
+                                        _buildDatePresetChip('This Month', () {
+                                          setDialogState(() {
+                                            selectedRange = DateTimeRange(
+                                              start: DateTime(DateTime.now().year, DateTime.now().month, 1),
+                                              end: DateTime.now(),
+                                            );
+                                          });
+                                        }),
+                                        const SizedBox(width: 6),
+                                        _buildDatePresetChip('Last 30 Days', () {
+                                          setDialogState(() {
+                                            selectedRange = DateTimeRange(
+                                              start: DateTime.now().subtract(const Duration(days: 30)),
+                                              end: DateTime.now(),
+                                            );
+                                          });
+                                        }),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                InkWell(
+                                  onTap: () async {
+                                    final picked = await showDateRangePicker(
+                                      context: context,
+                                      initialDateRange: selectedRange,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2035),
+                                    );
+                                    if (picked != null) {
+                                      setDialogState(() => selectedRange = picked);
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.date_range_rounded, size: 18, color: Color(0xFF2563EB)),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            '${DateFormat('dd MMM yyyy').format(selectedRange.start)}  —  ${DateFormat('dd MMM yyyy').format(selectedRange.end)}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                          ),
+                                        ),
+                                        const Text('Select Range', style: TextStyle(color: Color(0xFF2563EB), fontSize: 12, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ] else if (filterType == 'month') ...[
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Select Month & Year', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF334155))),
+                                    _buildDatePresetChip('Current Month', () {
+                                      setDialogState(() {
+                                        selectedMonth = DateTime.now().month;
+                                        selectedYear = DateTime.now().year;
+                                      });
+                                    }),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 3,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                                        ),
+                                        child: DropdownButtonHideUnderline(
+                                          child: DropdownButton<int>(
+                                            value: selectedMonth,
+                                            isExpanded: true,
+                                            items: List.generate(12, (index) {
+                                              return DropdownMenuItem(
+                                                value: index + 1,
+                                                child: Text(monthNames[index], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                              );
+                                            }),
+                                            onChanged: (val) {
+                                              if (val != null) setDialogState(() => selectedMonth = val);
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                                        ),
+                                        child: DropdownButtonHideUnderline(
+                                          child: DropdownButton<int>(
+                                            value: selectedYear,
+                                            isExpanded: true,
+                                            items: years.map((y) {
+                                              return DropdownMenuItem(
+                                                value: y,
+                                                child: Text(y.toString(), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                              );
+                                            }).toList(),
+                                            onChanged: (val) {
+                                              if (val != null) setDialogState(() => selectedYear = val);
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else if (filterType == 'all') ...[
+                                Row(
+                                  children: [
+                                    const Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB), size: 20),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Text(
+                                        'All transactions across all dates and customers will be exported into the PDF statement.',
+                                        style: TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Payment Status Filter
+                        const Text(
+                          'PAYMENT STATUS FILTER',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: Color(0xFF475569)),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: selectedStatus,
+                              isExpanded: true,
+                              items: const [
+                                DropdownMenuItem(value: 'ALL', child: Text('All Transactions (Paid, Partial, Unpaid)')),
+                                DropdownMenuItem(value: 'UNPAID_PARTIAL', child: Text('Unpaid & Partial Only (Outstanding)')),
+                                DropdownMenuItem(value: 'PAID', child: Text('Fully Paid Only')),
+                                DropdownMenuItem(value: 'UNPAID', child: Text('Fully Unpaid Only')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) setDialogState(() => selectedStatus = val);
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final provider = Provider.of<BillingProvider>(context, listen: false);
+                      Navigator.pop(context);
+
+                      String? dateParam = filterType == 'day' ? DateFormat('yyyy-MM-dd').format(selectedDate) : null;
+                      String? startParam = filterType == 'range' ? DateFormat('yyyy-MM-dd').format(selectedRange.start) : null;
+                      String? endParam = filterType == 'range' ? DateFormat('yyyy-MM-dd').format(selectedRange.end) : null;
+                      int? monthParam = filterType == 'month' ? selectedMonth : null;
+                      int? yearParam = filterType == 'month' ? selectedYear : null;
+
+                      final url = await provider.getAllTransactionsPdfUrl(
+                        filterType: filterType,
+                        date: dateParam,
+                        startDate: startParam,
+                        endDate: endParam,
+                        month: monthParam,
+                        year: yearParam,
+                        paymentStatus: selectedStatus,
+                      );
+
+                      if (mounted) {
+                        _launchInvoiceUrl(context, url, inApp: false);
+                      }
+                    },
+                    icon: const Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF0F172A)),
+                    label: const Text('DOWNLOAD PDF', style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+
+                      String? dateParam = filterType == 'day' ? DateFormat('yyyy-MM-dd').format(selectedDate) : null;
+                      String? startParam = filterType == 'range' ? DateFormat('yyyy-MM-dd').format(selectedRange.start) : null;
+                      String? endParam = filterType == 'range' ? DateFormat('yyyy-MM-dd').format(selectedRange.end) : null;
+                      int? monthParam = filterType == 'month' ? selectedMonth : null;
+                      int? yearParam = filterType == 'month' ? selectedYear : null;
+
+                      String titleSubtitle = 'All Time Report';
+                      if (filterType == 'day') {
+                        titleSubtitle = 'Day: ${DateFormat('dd MMMM yyyy').format(selectedDate)}';
+                      } else if (filterType == 'range') {
+                        titleSubtitle = '${DateFormat('dd MMM yyyy').format(selectedRange.start)} to ${DateFormat('dd MMM yyyy').format(selectedRange.end)}';
+                      } else if (filterType == 'month') {
+                        titleSubtitle = 'Month: ${monthNames[selectedMonth - 1]} $selectedYear';
+                      }
+
+                      _showAllTransactionsPdfPreviewDialog(
+                        filterType: filterType,
+                        date: dateParam,
+                        startDate: startParam,
+                        endDate: endParam,
+                        month: monthParam,
+                        year: yearParam,
+                        paymentStatus: selectedStatus,
+                        titleSubtitle: titleSubtitle,
+                      );
+                    },
+                    icon: const Icon(Icons.visibility_outlined, size: 16, color: Colors.white),
+                    label: const Text('PREVIEW & PRINT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildExportTypeTab(String type, String label, IconData icon, bool isSelected, VoidCallback onTap) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    const BoxShadow(
+                      color: Color(0x0F000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    )
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDatePresetChip(String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFBFDBFE)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+        ),
+      ),
+    );
+  }
+
+  void _showAllTransactionsPdfPreviewDialog({
+    required String filterType,
+    String? date,
+    String? startDate,
+    String? endDate,
+    int? month,
+    int? year,
+    String? paymentStatus,
+    required String titleSubtitle,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final billingProvider = Provider.of<BillingProvider>(context, listen: false);
+        return CallbackShortcuts(
+          bindings: {
+            SingleActivator(LogicalKeyboardKey.escape): () {
+              Navigator.pop(context);
+            },
+          },
+          child: Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Container(
+              width: 950,
+              height: 750,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'All Transactions Report Preview',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              Text(
+                                titleSubtitle,
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: PdfPreview(
+                      build: (format) async {
+                        final bytes = await billingProvider.getAllTransactionsPdfBytes(
+                          filterType: filterType,
+                          date: date,
+                          startDate: startDate,
+                          endDate: endDate,
+                          month: month,
+                          year: year,
+                          paymentStatus: paymentStatus,
+                        );
+                        if (bytes == null) {
+                          throw Exception('Failed to load Transactions PDF report');
+                        }
+                        return bytes;
+                      },
+                      allowPrinting: true,
+                      allowSharing: true,
+                      canChangePageFormat: false,
+                      canChangeOrientation: false,
+                      canDebug: false,
+                      loadingWidget: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      onError: (context, error) {
+                        return Center(
+                          child: Text(
+                            'Error loading PDF: $error',
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showStatementPreviewDialog() {
     if (_selectedCustomer == null) return;
 
@@ -1890,7 +2507,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           const Icon(Icons.description_outlined, color: Color(0xFF2563EB)),
                           const SizedBox(width: 8),
                           Text(
-                            'Statement Preview - \${_selectedCustomer!.name}',
+                            'Statement Preview - ${_selectedCustomer!.name}',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                         ],
@@ -1922,7 +2539,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       onError: (context, error) {
                         return Center(
                           child: Text(
-                            'Error loading PDF: \$error',
+                            'Error loading PDF: $error',
                             style: const TextStyle(color: Colors.red),
                           ),
                         );

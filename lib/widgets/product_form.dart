@@ -20,12 +20,13 @@ class _ProductFormState extends State<ProductForm> {
   late TextEditingController _noOfCaseController;
   late TextEditingController _centInPerCsController;
   late TextEditingController _minStockLevelController;
-  double _totalStockInCent = 0.0;
+  double _calculatedTotalStock = 0.0;
   bool _isCentMode = true; // Default to Cent mode
 
   @override
   void initState() {
     super.initState();
+    _isCentMode = widget.product == null ? true : (widget.product!.entryMode != 'piece');
     _nameController = TextEditingController(text: widget.product?.name ?? '');
     _brandController = TextEditingController(text: widget.product?.brand ?? '');
     
@@ -39,9 +40,19 @@ class _ProductFormState extends State<ProductForm> {
     _noOfCaseController = TextEditingController(
       text: (widget.product == null || widget.product!.noOfCase == 0) ? '' : widget.product!.noOfCase.toString()
     );
-    _centInPerCsController = TextEditingController(
-      text: (widget.product == null || widget.product!.centInPerCs == 0) ? '' : widget.product!.centInPerCs.toString()
-    );
+
+    String initialPerCs = '';
+    if (widget.product != null && widget.product!.centInPerCs != 0) {
+      if (_isCentMode) {
+        initialPerCs = widget.product!.centInPerCs.toString();
+      } else {
+        // In piece mode, centInPerCs is stored as cents in DB (e.g. 10.0 for 100 pcs)
+        final pieces = (widget.product!.centInPerCs * 10).round();
+        initialPerCs = pieces.toString();
+      }
+    }
+    _centInPerCsController = TextEditingController(text: initialPerCs);
+
     _minStockLevelController = TextEditingController(
       text: widget.product?.minStockLevel.toString() ?? '5'
     );
@@ -55,13 +66,9 @@ class _ProductFormState extends State<ProductForm> {
     final cases = double.tryParse(_noOfCaseController.text) ?? 0.0;
     final valPerCs = double.tryParse(_centInPerCsController.text) ?? 0.0;
     setState(() {
-      if (_isCentMode) {
-        // Cent mode: valPerCs is already in cents
-        _totalStockInCent = cases * valPerCs;
-      } else {
-        // Piece mode: valPerCs is in pieces, convert pieces to cents (1 cent = 10 pieces)
-        _totalStockInCent = (cases * valPerCs) / 10.0;
-      }
+      // In Cent mode: cases * cents per case = total cents
+      // In Piece mode: cases * pieces per case = total pieces
+      _calculatedTotalStock = cases * valPerCs;
     });
   }
 
@@ -119,8 +126,8 @@ class _ProductFormState extends State<ProductForm> {
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 20,
-        right: 20,
+        left: 0,
+        right: 0,
         top: 20,
       ),
       child: Form(
@@ -129,118 +136,147 @@ class _ProductFormState extends State<ProductForm> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                widget.product == null ? 'Add Product' : 'Edit Product',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-              ),
-              const SizedBox(height: 16),
-              
-              _buildTextField(_nameController, 'Product Name'),
-              _buildTextField(_brandController, 'Brand'),
-              
-              Row(
-                children: [
-                  Expanded(child: _buildTextField(_purchasePriceController, 'Purchase Price', isNum: true)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildTextField(_sellingPriceController, 'Selling Price', isNum: true)),
-                ],
-              ),
-
-              // Unit toggle — pill style, same as billing screen
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Unit',
-                      style: TextStyle(fontSize: 13.5, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                    Text(
+                      widget.product == null ? 'Add Product' : 'Edit Product',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                     ),
-                    const SizedBox(width: 12),
-                    Container(
-                      height: 32,
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                    const SizedBox(height: 16),
+                    
+                    _buildTextField(_nameController, 'Product Name'),
+                    _buildTextField(_brandController, 'Brand'),
+                    
+                    Row(
+                      children: [
+                        Expanded(child: _buildTextField(_purchasePriceController, 'Purchase Price', isNum: true)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildTextField(_sellingPriceController, 'Selling Price', isNum: true)),
+                      ],
+                    ),
+
+                    // Unit toggle — pill style, same as billing screen
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildUnitOption('Unit', !_isCentMode, () {
-                            setState(() {
-                              _isCentMode = false;
-                              _updateTotalStock();
-                            });
-                          }),
-                          _buildUnitOption('Cent (10x)', _isCentMode, () {
-                            setState(() {
-                              _isCentMode = true;
-                              _updateTotalStock();
-                            });
-                          }),
+                          const Text(
+                            'Unit',
+                            style: TextStyle(fontSize: 13.5, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            height: 32,
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildUnitOption('Piece', !_isCentMode, () {
+                                  setState(() {
+                                    _isCentMode = false;
+                                    _updateTotalStock();
+                                  });
+                                }),
+                                _buildUnitOption('Cent (10x)', _isCentMode, () {
+                                  setState(() {
+                                    _isCentMode = true;
+                                    _updateTotalStock();
+                                  });
+                                }),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
+                    Row(
+                      children: [
+                        Expanded(child: _buildTextField(_noOfCaseController, 'No. Of Case', isNum: true)),
+                        const SizedBox(width: 8),
+                        // Always show the field, change label
+                        Expanded(
+                          child: _buildTextField(
+                            _centInPerCsController,
+                            _isCentMode ? 'Cent in per cs' : 'Pieces in per cs',
+                            isNum: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    _buildTextField(
+                      _minStockLevelController,
+                      _isCentMode ? 'Min Stock Level (in cent) — Alert threshold' : 'Min Stock Level (in pieces) — Alert threshold',
+                      isNum: true,
+                      isRequired: false,
+                    ),
+                    
+                    // Dynamic Display of calculated Total stock
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _isCentMode ? 'Total Stock (in cent):' : 'Total Stock (in pieces):',
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E3A8A),
+                              ),
+                            ),
+                            Text(
+                              _isCentMode
+                                  ? '${_calculatedTotalStock.toStringAsFixed(1)} cent'
+                                  : '${_calculatedTotalStock.toInt()} pieces',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2563EB),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
-              Row(
-                children: [
-                  Expanded(child: _buildTextField(_noOfCaseController, 'No. Of Case', isNum: true)),
-                  const SizedBox(width: 8),
-                  // Always show the field, change label
-                  Expanded(
-                    child: _buildTextField(
-                      _centInPerCsController,
-                      _isCentMode ? 'Cent in per cs' : 'Pieces in per cs',
-                      isNum: true,
-                    ),
-                  ),
-                ],
-              ),
-              _buildTextField(_minStockLevelController, 'Min Stock Level (in cent) — Alert threshold', isNum: true, isRequired: false),
-              
-              // Dynamic Display of calculated Total stock
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFBFDBFE)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Total Stock (in cent):',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E3A8A),
-                        ),
-                      ),
-                      Text(
-                        _totalStockInCent.toStringAsFixed(1),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2563EB),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: _submit,
-                  child: Text(widget.product == null ? 'Create Product' : 'Update Product'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(0),
+                    ),
+                  ),
+                  child: Text(
+                    widget.product == null ? 'Create Product' : 'Update Product',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

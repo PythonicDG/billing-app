@@ -185,9 +185,22 @@ class _BillingScreenState extends State<BillingScreen> {
 
     // Apply dynamic filtering locally over loaded products
     final settingsProvider = Provider.of<SettingsProvider>(context);
-    final String searchQuery = _searchController.text.toLowerCase();
+    final String searchQuery = _searchController.text.trim().toLowerCase();
+    final List<String> searchTokens = searchQuery.isEmpty
+        ? const []
+        : searchQuery.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+
     List<Product> displayedProducts = productProvider.billingProducts.where((p) {
-      final matchesSearch = p.name.toLowerCase().contains(searchQuery);
+      final nameLower = p.name.toLowerCase();
+      final brandLower = p.brand.toLowerCase();
+      final skuLower = p.sku?.toLowerCase() ?? '';
+
+      final matchesSearch = searchTokens.isEmpty ||
+          searchTokens.every((token) =>
+              nameLower.contains(token) ||
+              brandLower.contains(token) ||
+              skuLower.contains(token));
+
       if (settingsProvider.hideOutOfStock) {
         return matchesSearch && p.stockQuantity > 0;
       }
@@ -458,7 +471,7 @@ class _BillingScreenState extends State<BillingScreen> {
                     focusNode: _searchFocusNode,
                     style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                     decoration: InputDecoration(
-                      hintText: 'Quick find firecrackers... (Ctrl+F)',
+                      hintText: 'Search by product name or brand... (Ctrl+F)',
                       prefixIcon: const Icon(Icons.search_outlined, color: Color(0xFF2563EB), size: 20),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(

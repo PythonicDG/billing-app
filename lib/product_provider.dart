@@ -57,6 +57,31 @@ class Product {
     required this.entryMode,
   });
 
+  // Stock is stored in whole pieces; one cent contains ten pieces.
+  int get piecesPerCase {
+    final pieces = centInPerCs * 10;
+    if (!pieces.isFinite || pieces <= 0 ||
+        (pieces - pieces.round()).abs() > 0.000001) {
+      return 0;
+    }
+    return pieces.round();
+  }
+
+  int piecesForUnit(String unit) => switch (unit) {
+    'PIECE' => 1,
+    'CENT' => 10,
+    'CASE' => piecesPerCase,
+    _ => 0,
+  };
+
+  double priceForUnit(String unit) {
+    final multiplier = piecesForUnit(unit);
+    final price = entryMode == 'cent'
+        ? sellingPrice * (multiplier / 10.0)
+        : sellingPrice * multiplier;
+    return double.parse(price.toStringAsFixed(2));
+  }
+
   String formattedPrice(double price) {
     final unit = entryMode == 'cent' ? 'cent' : 'piece';
     return 'Rs. ${price.toStringAsFixed(2)} / $unit';

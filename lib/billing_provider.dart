@@ -60,6 +60,7 @@ class InvoiceItem {
 class BillingProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final List<InvoiceItem> _cart = [];
+  final Map<String, int> _editingStockCredits = {};
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -70,25 +71,26 @@ class BillingProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  int availableStock(Product product) =>
+      product.stockQuantity + (_editingStockCredits[product.uuid] ?? 0);
+
   void addToCart(Product product, {String? unit}) {
     final defaultUnit = unit ?? (product.entryMode == 'cent' ? 'CENT' : 'PIECE');
     final existingIndex = _cart.indexWhere((item) => item.product.uuid == product.uuid);
     if (existingIndex != -1) {
       final item = _cart[existingIndex];
       // Toggling unit is handled by toggleUnit, here we just increment quantity if possible
-      final requestedQuantity = item.unit == 'CENT' ? (item.quantity + 1) * 10 : item.quantity + 1;
+      final requestedQuantity = (item.quantity + 1) * item.product.piecesForUnit(item.unit);
       
-      if (requestedQuantity <= product.stockQuantity) {
+      if (requestedQuantity <= availableStock(item.product)) {
         item.quantity++;
       }
     } else {
-      final requestedPieces = defaultUnit == 'CENT' ? 10 : 1;
-      if (product.stockQuantity >= requestedPieces) {
-        final double calculatedPrice = product.entryMode == 'cent'
-            ? (defaultUnit == 'CENT' ? product.sellingPrice : product.sellingPrice / 10.0)
-            : (defaultUnit == 'CENT' ? product.sellingPrice * 10.0 : product.sellingPrice);
+      final requestedPieces = product.piecesForUnit(defaultUnit);
+      if (requestedPieces > 0 && availableStock(product) >= requestedPieces) {
+        final double calculatedPrice = product.priceForUnit(defaultUnit);
 
-        _cart.add(InvoiceItem(
+        _cart.insert(0, InvoiceItem(
           product: product,
           quantity: 1,
           unitPrice: double.parse(calculatedPrice.toStringAsFixed(2)),
@@ -104,29 +106,25 @@ class BillingProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  bool setUnit(String uuid, String unit) {
+    final index = _cart.indexWhere((item) => item.product.uuid == uuid);
+    if (index == -1) return false;
+    final item = _cart[index];
+    if (item.unit == unit) return true;
+    final multiplier = item.product.piecesForUnit(unit);
+    if (multiplier <= 0 || item.quantity * multiplier > availableStock(item.product)) {
+      return false;
+    }
+    item.unit = unit;
+    item.unitPrice = item.product.priceForUnit(unit);
+    notifyListeners();
+    return true;
+  }
+
   void toggleUnit(String uuid) {
     final index = _cart.indexWhere((item) => item.product.uuid == uuid);
     if (index != -1) {
-      final item = _cart[index];
-      if (item.unit == 'PIECE') {
-        // Switch to CENT
-        // Check if stock is available (1 CENT = 10 PIECES)
-        if (item.quantity * 10 <= item.product.stockQuantity) {
-          item.unit = 'CENT';
-          final double price = item.product.entryMode == 'cent'
-              ? item.product.sellingPrice
-              : item.product.sellingPrice * 10.0;
-          item.unitPrice = double.parse(price.toStringAsFixed(2));
-        }
-      } else {
-        // Switch to PIECE
-        item.unit = 'PIECE';
-        final double price = item.product.entryMode == 'cent'
-            ? item.product.sellingPrice / 10.0
-            : item.product.sellingPrice;
-        item.unitPrice = double.parse(price.toStringAsFixed(2));
-      }
-      notifyListeners();
+      setUnit(uuid, _cart[index].unit == 'PIECE' ? 'CENT' : 'PIECE');
     }
   }
 
@@ -134,9 +132,11 @@ class BillingProvider with ChangeNotifier {
     final index = _cart.indexWhere((item) => item.product.uuid == uuid);
     if (index != -1) {
       final item = _cart[index];
-      final requestedPieces = item.unit == 'CENT' ? quantity * 10 : quantity;
+      final multiplier = item.product.piecesForUnit(item.unit);
+      final requestedPieces = quantity * multiplier;
 
-      if (quantity > 0 && requestedPieces <= maxStock) {
+      final available = maxStock + (_editingStockCredits[uuid] ?? 0);
+      if (quantity > 0 && multiplier > 0 && requestedPieces <= available) {
         item.quantity = quantity;
       } else if (quantity == 0) {
         _cart.removeAt(index);
@@ -176,6 +176,7 @@ class BillingProvider with ChangeNotifier {
 
   void clearCart() {
     _cart.clear();
+    _editingStockCredits.clear();
     _discountAmount = 0.0;
     _errorMessage = null;
     _editingInvoiceId = null;
@@ -535,6 +536,12 @@ class BillingProvider with ChangeNotifier {
           unit: itemData['unit']?.toString() ?? 'PIECE',
         );
         _cart.add(item);
+        final originalMultiplier = item.unit == 'CASE'
+            ? (int.tryParse(itemData['pieces_per_case']?.toString() ?? '') ?? product.piecesPerCase)
+            : product.piecesForUnit(item.unit);
+        _editingStockCredits.update(product.uuid,
+            (pieces) => pieces + item.quantity * originalMultiplier,
+            ifAbsent: () => item.quantity * originalMultiplier);
       }
     }
     notifyListeners();

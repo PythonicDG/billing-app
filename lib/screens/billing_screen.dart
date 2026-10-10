@@ -388,7 +388,7 @@ class _BillingScreenState extends State<BillingScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${billingProvider.cart.length} Products | ${billingProvider.cart.fold(0, (sum, i) => sum + i.quantity)} Pcs',
+                  '${billingProvider.cart.length} Products | ${billingProvider.cart.fold(0, (sum, i) => sum + i.quantity * i.product.piecesForUnit(i.unit))} Pcs',
                   style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 2),
@@ -875,11 +875,10 @@ class _BillingScreenState extends State<BillingScreen> {
     final cartItem = isInCart ? billingProvider.cart.firstWhere((item) => item.product.uuid == product.uuid) : null;
     
     final selectedUnit = isInCart ? cartItem!.unit : (_tempUnits[product.uuid] ?? (product.entryMode == 'cent' ? 'CENT' : 'PIECE'));
-    final currentPrice = product.entryMode == 'cent'
-        ? (selectedUnit == 'CENT' ? product.sellingPrice : product.sellingPrice / 10.0)
-        : (selectedUnit == 'CENT' ? product.sellingPrice * 10.0 : product.sellingPrice);
+    final currentPrice = product.priceForUnit(selectedUnit);
     
-    final isOutOfStock = product.totalStockInCent <= 0;
+    final availableStock = billingProvider.availableStock(product);
+    final isOutOfStock = availableStock <= 0;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
@@ -928,7 +927,9 @@ class _BillingScreenState extends State<BillingScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      isOutOfStock ? 'Sold Out' : '${product.totalStockInCent.toStringAsFixed(1)} cent left',
+                      isOutOfStock ? 'Sold Out' : selectedUnit == 'CASE' && product.piecesPerCase > 0
+                          ? '${availableStock ~/ product.piecesPerCase} cases left'
+                          : '${(availableStock / 10).toStringAsFixed(1)} cent left',
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.bold,
@@ -965,13 +966,21 @@ class _BillingScreenState extends State<BillingScreen> {
           
           // Unit Selection
           Expanded(
-            flex: 20,
+            flex: 30,
             child: Center(
               child: _buildUnitToggle(
                 currentUnit: selectedUnit,
+                caseEnabled: product.piecesPerCase > 0,
+                caseDescription: product.piecesPerCase > 0
+                    ? '1 case = ${product.centInPerCs} cents (${product.piecesPerCase} units)'
+                    : 'Set cents per case in inventory to use Case',
                 onToggle: (newUnit) {
                   if (isInCart) {
-                    billingProvider.toggleUnit(product.uuid);
+                    if (!billingProvider.setUnit(product.uuid, newUnit)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Insufficient stock for this quantity in the selected unit.')),
+                      );
+                    }
                   } else {
                     setState(() {
                       _tempUnits[product.uuid] = newUnit;
@@ -1056,7 +1065,8 @@ class _BillingScreenState extends State<BillingScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                         padding: EdgeInsets.zero,
                       ),
-                      onPressed: !isOutOfStock
+                      onPressed: product.piecesForUnit(selectedUnit) > 0 &&
+                          availableStock >= product.piecesForUnit(selectedUnit)
                           ? () => billingProvider.addToCart(product, unit: selectedUnit)
                           : null,
                       child: const Text(
@@ -1159,19 +1169,22 @@ class _BillingScreenState extends State<BillingScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 2),
-                                  Row(
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 8,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
                                       // INLINE EDITABLE PRICE TEXTFIELD inside the Checkout list
                                       SizedBox(
-                                        width: 90,
-                                        height: 34,
+                                        width: 116,
+                                        height: 44,
                                         child: Container(
                                           alignment: Alignment.centerLeft,
-                                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFFF8FAFC),
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.zero,
                                             border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
                                           ),
                                           child: Row(
@@ -1191,12 +1204,15 @@ class _BillingScreenState extends State<BillingScreen> {
                                                   style: const TextStyle(
                                                     color: Color(0xFF0F172A),
                                                     fontWeight: FontWeight.bold,
-                                                    fontSize: 13,
+                                                    fontSize: 14,
                                                   ),
                                                   decoration: const InputDecoration(
                                                     border: InputBorder.none,
+                                                    enabledBorder: InputBorder.none,
+                                                    focusedBorder: InputBorder.none,
+                                                    filled: false,
                                                     isDense: true,
-                                                    contentPadding: EdgeInsets.only(left: 3, bottom: 1),
+                                                    contentPadding: EdgeInsets.only(left: 6),
                                                   ),
                                                   onChanged: (value) {
                                                     if (value.isNotEmpty) {
@@ -1213,18 +1229,18 @@ class _BillingScreenState extends State<BillingScreen> {
                                         ),
                                       ),
                                       const Text(
-                                        ' x ',
+                                        '×',
                                         style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
                                       ),
                                       // INLINE EDITABLE QUANTITY TEXTFIELD inside the Checkout list
                                       SizedBox(
-                                        width: 58,
-                                        height: 34,
+                                        width: 76,
+                                        height: 44,
                                         child: Container(
                                           alignment: Alignment.center,
                                           decoration: BoxDecoration(
                                             color: const Color(0xFFEFF6FF),
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.zero,
                                             border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.4), width: 1.2),
                                           ),
                                           child: TextField(
@@ -1234,12 +1250,15 @@ class _BillingScreenState extends State<BillingScreen> {
                                             style: const TextStyle(
                                               color: Color(0xFF2563EB),
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 14,
+                                              fontSize: 15,
                                             ),
                                             decoration: const InputDecoration(
                                               border: InputBorder.none,
+                                              enabledBorder: InputBorder.none,
+                                              focusedBorder: InputBorder.none,
+                                              filled: false,
                                               isDense: true,
-                                              contentPadding: EdgeInsets.only(bottom: 1),
+                                              contentPadding: EdgeInsets.symmetric(horizontal: 8),
                                             ),
                                             onChanged: (value) {
                                               if (value.isNotEmpty) {
@@ -1257,10 +1276,9 @@ class _BillingScreenState extends State<BillingScreen> {
                                         ),
                                       ),
                                       Text(
-                                        ' ${item.unit == 'CENT' ? 'Cent' : 'Unit'}',
+                                        item.unit == 'CASE' ? 'Case' : item.unit == 'CENT' ? 'Cent' : 'Unit',
                                         style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
                                       ),
-                                      const SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                         decoration: BoxDecoration(
@@ -2191,7 +2209,8 @@ class _BillingScreenState extends State<BillingScreen> {
     );
   }
 
-  Widget _buildUnitToggle({required String currentUnit, required Function(String) onToggle}) {
+  Widget _buildUnitToggle({required String currentUnit, required Function(String) onToggle,
+    required bool caseEnabled, required String caseDescription}) {
     return Container(
       height: 28,
       padding: const EdgeInsets.all(2),
@@ -2199,7 +2218,29 @@ class _BillingScreenState extends State<BillingScreen> {
       child: Row(
         children: [
           Expanded(child: _buildUnitOption('Unit', currentUnit == 'PIECE', () => onToggle('PIECE'))),
-          Expanded(child: _buildUnitOption('Cent (10x)', currentUnit == 'CENT', () => onToggle('CENT'))),
+          const VerticalDivider(
+            width: 7,
+            thickness: 1,
+            indent: 5,
+            endIndent: 5,
+            color: Color(0xFFCBD5E1),
+          ),
+          Expanded(flex: 2, child: _buildUnitOption('Cent (10x)', currentUnit == 'CENT', () => onToggle('CENT'))),
+          const VerticalDivider(
+            width: 7,
+            thickness: 1,
+            indent: 5,
+            endIndent: 5,
+            color: Color(0xFFCBD5E1),
+          ),
+          Expanded(child: Tooltip(
+            message: caseDescription,
+            child: Opacity(
+              opacity: caseEnabled ? 1 : 0.4,
+              child: _buildUnitOption('Case', currentUnit == 'CASE',
+                () { if (caseEnabled) onToggle('CASE'); }),
+            ),
+          )),
         ],
       ),
     );
@@ -2210,16 +2251,22 @@ class _BillingScreenState extends State<BillingScreen> {
       onTap: onTap,
       child: Container(
         alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF2563EB) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? Colors.white : const Color(0xFF64748B),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            maxLines: 1,
+            softWrap: false,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? Colors.white : const Color(0xFF64748B),
+            ),
           ),
         ),
       ),

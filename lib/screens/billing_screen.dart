@@ -1410,6 +1410,7 @@ class _BillingScreenState extends State<BillingScreen> {
     _customerPhoneController.text = provider.customerPhone ?? '';
     _paymentMethod = 'CASH';
     double changeAmount = 0.0;
+    double balanceDue = 0.0;
     
     // Auto focus customer name when wizard opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1429,8 +1430,11 @@ class _BillingScreenState extends State<BillingScreen> {
         builder: (context, setModalState) {
           // Live calculation of cash change
           double paidVal = double.tryParse(_paidAmountController.text) ?? 0.0;
+          // Cash above the bill total is change handed back; it is never counted as paid.
           changeAmount = paidVal - provider.grandTotal;
           if (changeAmount < 0) changeAmount = 0.0;
+          balanceDue = provider.grandTotal - paidVal;
+          if (balanceDue < 0) balanceDue = 0.0;
 
           return RawKeyboardListener(
             focusNode: FocusNode(), // Temporary node for local listening
@@ -1754,7 +1758,7 @@ class _BillingScreenState extends State<BillingScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text('NET TO COLLECT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
-                              Text(currencyFormat.format(provider.grandTotal), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                              Text(currencyFormat.format(balanceDue), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: balanceDue > 0 ? const Color(0xFF2563EB) : const Color(0xFF16A34A))),
                             ],
                           ),
                           if (provider.isLoading)

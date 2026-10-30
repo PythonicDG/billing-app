@@ -7,13 +7,11 @@ import 'constants.dart';
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   String? _token;
-  String? _role;
   int? _userId;
   bool _isLoading = false;
   String? _errorMessage;
 
   String? get token => _token;
-  String? get role => _role;
   int? get userId => _userId;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -26,7 +24,6 @@ class AuthProvider with ChangeNotifier {
   Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('token');
-    _role = prefs.getString('role');
     _userId = prefs.getInt('userId');
     notifyListeners();
   }
@@ -45,9 +42,8 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _token = data['token'];
-        _role = data['role'];
         _userId = data['user_id'];
-        await _apiService.saveToken(_token!, _role!, _userId!);
+        await _apiService.saveToken(_token!, _userId!);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -110,7 +106,6 @@ class AuthProvider with ChangeNotifier {
   Future<void> logout() async {
     await _apiService.logout();  // This already clears dashboard token via ApiService.logout()
     _token = null;
-    _role = null;
     _userId = null;
     notifyListeners();
   }

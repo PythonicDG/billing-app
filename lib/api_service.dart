@@ -16,10 +16,9 @@ class ApiService {
     return prefs.getString('token');
   }
 
-  Future<void> saveToken(String token, String role, int userId) async {
+  Future<void> saveToken(String token, int userId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', token);
-    await prefs.setString('role', role);
     await prefs.setInt('userId', userId);
   }
 

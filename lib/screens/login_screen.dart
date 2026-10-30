@@ -26,19 +26,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (success) {
-        final role = authProvider.role;
-        if (role == 'OWNER' || role == 'STAFF') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const BillingScreen()),
-          );
-        } else {
-          // VIEWER role or other
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const ViewerScreen()),
-          );
-        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const BillingScreen()),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Login failed. Please check credentials.')),
@@ -177,18 +168,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class ViewerScreen extends StatelessWidget {
-  const ViewerScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Viewer Dashboard')),
-      body: const Center(child: Text('Viewer role - Read-only access')),
     );
   }
 }

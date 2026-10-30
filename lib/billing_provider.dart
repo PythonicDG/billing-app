@@ -185,6 +185,15 @@ class BillingProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Amount recorded as paid for the bill. Cash received above the bill total is
+  /// change handed back, so it is ignored and never stored as money paid.
+  double _payablePaidAmount(double received) {
+    final total = double.parse(grandTotal.toStringAsFixed(2));
+    final paid = double.parse(received.toStringAsFixed(2));
+    if (paid < 0) return 0.0;
+    return paid > total ? total : paid;
+  }
+
   Future<Map<String, dynamic>?> previewInvoice({
     required String? customerName,
     required String? customerPhone,
@@ -203,7 +212,7 @@ class BillingProvider with ChangeNotifier {
         'tax_amount': double.parse(taxAmount.toStringAsFixed(2)),
         'discount_amount': double.parse(_discountAmount.toStringAsFixed(2)),
         'grand_total': double.parse(grandTotal.toStringAsFixed(2)),
-        'paid_amount': double.parse(paidAmount.toStringAsFixed(2)),
+        'paid_amount': _payablePaidAmount(paidAmount),
         'payment_method': paymentMethod,
         'items': _cart.map((item) => item.toJson()).toList(),
       };
@@ -245,7 +254,7 @@ class BillingProvider with ChangeNotifier {
         'tax_amount': double.parse(taxAmount.toStringAsFixed(2)),
         'discount_amount': double.parse(_discountAmount.toStringAsFixed(2)),
         'grand_total': double.parse(grandTotal.toStringAsFixed(2)),
-        'paid_amount': double.parse(paidAmount.toStringAsFixed(2)),
+        'paid_amount': _payablePaidAmount(paidAmount),
         'payment_method': paymentMethod,
         'items': _cart.map((item) => item.toJson()).toList(),
       };
@@ -566,7 +575,7 @@ class BillingProvider with ChangeNotifier {
         'tax_amount': double.parse(taxAmount.toStringAsFixed(2)),
         'discount_amount': double.parse(_discountAmount.toStringAsFixed(2)),
         'grand_total': double.parse(grandTotal.toStringAsFixed(2)),
-        'paid_amount': double.parse(paidAmount.toStringAsFixed(2)),
+        'paid_amount': _payablePaidAmount(paidAmount),
         'payment_method': paymentMethod,
         'items': _cart.map((item) => item.toJson()).toList(),
       };

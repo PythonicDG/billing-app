@@ -523,8 +523,14 @@ class _BillingScreenState extends State<BillingScreen> {
                         if (paginatedProducts.isNotEmpty) {
                           final product = paginatedProducts[_highlightedIndex.clamp(0, paginatedProducts.length - 1)];
                           final unit = _tempUnits[product.uuid] ?? (product.entryMode == 'cent' ? 'CENT' : 'PIECE');
+                          if (product.sellingPrice <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('${product.name} has no valid price. Edit the product first.')),
+                            );
+                            return;
+                          }
                           billingProvider.addToCart(product, unit: unit);
-                         
+
                          // Auto focus the quantity field of the added item
                          WidgetsBinding.instance.addPostFrameCallback((_) {
                            _getQtyFocusNode(product.uuid).requestFocus();
@@ -1065,7 +1071,8 @@ class _BillingScreenState extends State<BillingScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                         padding: EdgeInsets.zero,
                       ),
-                      onPressed: product.piecesForUnit(selectedUnit) > 0 &&
+                      onPressed: product.sellingPrice > 0 &&
+                          product.piecesForUnit(selectedUnit) > 0 &&
                           availableStock >= product.piecesForUnit(selectedUnit)
                           ? () => billingProvider.addToCart(product, unit: selectedUnit)
                           : null,

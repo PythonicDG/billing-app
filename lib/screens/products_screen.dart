@@ -178,7 +178,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
   @override
   Widget build(BuildContext context) {
     final productProvider = Provider.of<ProductProvider>(context);
-    const isOwner = true;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -214,8 +213,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             tooltip: 'Export Inventory (CSV)',
             onPressed: () => _handleExport(context, productProvider),
           ),
-          if (isOwner) ...[
-            IconButton(
+          IconButton(
               icon: const Icon(Icons.cloud_upload_outlined, color: Color(0xFF2563EB)),
               tooltip: 'Bulk Upload',
               onPressed: () {
@@ -229,7 +227,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 _showProductForm(context);
               },
             ),
-          ],
           const SizedBox(width: 8),
         ],
         elevation: 0,
@@ -302,8 +299,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         },
                       ),
                     ),
-                    if (isOwner) ...[
-                      const SizedBox(width: 12),
+                    const SizedBox(width: 12),
                       SizedBox(
                         height: 52,
                         child: ElevatedButton.icon(
@@ -322,7 +318,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           ),
                         ),
                       ),
-                    ],
                   ],
                 ),
               ),
@@ -443,18 +438,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
                         return LayoutBuilder(
                           builder: (context, constraints) {
-                            final double minWidth = isOwner ? 1000.0 : 800.0;
+                            final double minWidth = 1000.0;
                             final double tableWidth = constraints.maxWidth > minWidth ? constraints.maxWidth : minWidth;
 
-                            final double prodWidth = isOwner ? tableWidth * 0.19 : tableWidth * 0.25;
-                            final double brandWidth = isOwner ? tableWidth * 0.10 : tableWidth * 0.11;
-                            final double purchaseWidth = isOwner ? tableWidth * 0.11 : 0.0;
-                            final double sellingWidth = isOwner ? tableWidth * 0.11 : tableWidth * 0.14;
-                            final double casesWidth = isOwner ? tableWidth * 0.09 : tableWidth * 0.11;
-                            final double centCsWidth = isOwner ? tableWidth * 0.10 : tableWidth * 0.12;
-                            final double stockWidth = isOwner ? tableWidth * 0.10 : tableWidth * 0.12;
-                            final double statusWidth = isOwner ? tableWidth * 0.12 : tableWidth * 0.15;
-                            final double actionsWidth = isOwner ? tableWidth * 0.08 : 0.0;
+                            final double prodWidth = tableWidth * 0.19;
+                            final double brandWidth = tableWidth * 0.10;
+                            final double purchaseWidth = tableWidth * 0.11;
+                            final double sellingWidth = tableWidth * 0.11;
+                            final double casesWidth = tableWidth * 0.09;
+                            final double centCsWidth = tableWidth * 0.10;
+                            final double stockWidth = tableWidth * 0.10;
+                            final double statusWidth = tableWidth * 0.12;
+                            final double actionsWidth = tableWidth * 0.08;
 
                             return SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
@@ -471,14 +466,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                       columns: [
                                         DataColumn(label: SizedBox(width: prodWidth, child: const Text('PRODUCT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                         DataColumn(label: SizedBox(width: brandWidth, child: const Text('BRAND', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
-                                        if (isOwner)
-                                          DataColumn(label: SizedBox(width: purchaseWidth, child: const Text('PURCHASE PRICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
+                                        DataColumn(label: SizedBox(width: purchaseWidth, child: const Text('PURCHASE PRICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                         DataColumn(label: SizedBox(width: sellingWidth, child: const Text('SELLING PRICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                         DataColumn(label: SizedBox(width: centCsWidth, child: const Text('CENT IN PER CS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                         DataColumn(label: SizedBox(width: stockWidth, child: const Text('TOTAL STOCK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                         DataColumn(label: SizedBox(width: statusWidth, child: const Text('STOCK STATUS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
-                                        if (isOwner)
-                                          DataColumn(label: SizedBox(width: actionsWidth, child: const Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
+                                        DataColumn(label: SizedBox(width: actionsWidth, child: const Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF475569))))),
                                       ],
                                       rows: const [],
                                     ),
@@ -496,14 +489,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                           columns: [
                                             DataColumn(label: SizedBox(width: prodWidth)),
                                             DataColumn(label: SizedBox(width: brandWidth)),
-                                            if (isOwner)
-                                              DataColumn(label: SizedBox(width: purchaseWidth)),
+                                            DataColumn(label: SizedBox(width: purchaseWidth)),
                                             DataColumn(label: SizedBox(width: sellingWidth)),
                                             DataColumn(label: SizedBox(width: centCsWidth)),
                                             DataColumn(label: SizedBox(width: stockWidth)),
                                             DataColumn(label: SizedBox(width: statusWidth)),
-                                            if (isOwner)
-                                              DataColumn(label: SizedBox(width: actionsWidth)),
+                                            DataColumn(label: SizedBox(width: actionsWidth)),
                                           ],
                                           rows: paginatedProducts.map((product) {
                                             final isOutOfStock = product.totalStockInCent <= 0;
@@ -538,8 +529,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                     ),
                                                   ),
                                                 ),
-                                                if (isOwner)
-                                                  DataCell(SizedBox(width: purchaseWidth, child: Text(product.formattedPrice(product.purchasePrice), style: const TextStyle(fontSize: 12.5)))),
+                                                DataCell(SizedBox(width: purchaseWidth, child: Text(product.formattedPrice(product.purchasePrice), style: const TextStyle(fontSize: 12.5)))),
                                                 DataCell(SizedBox(width: sellingWidth, child: Text(product.formattedPrice(product.sellingPrice), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF2563EB))))),
                                                 DataCell(SizedBox(width: centCsWidth, child: Text(product.entryMode == 'cent' ? '${product.centInPerCs} cent/cs' : '${(product.centInPerCs * 10).toInt()} pieces/cs', style: const TextStyle(fontSize: 12.5)))),
                                                 DataCell(
@@ -590,8 +580,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                                     ),
                                                   ),
                                                 ),
-                                                if (isOwner)
-                                                  DataCell(
+                                                DataCell(
                                                     SizedBox(
                                                       width: actionsWidth,
                                                       child: Row(

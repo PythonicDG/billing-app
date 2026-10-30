@@ -152,9 +152,9 @@ class _ProductFormState extends State<ProductForm> {
                     
                     Row(
                       children: [
-                        Expanded(child: _buildTextField(_purchasePriceController, 'Purchase Price', isNum: true)),
+                        Expanded(child: _buildTextField(_purchasePriceController, 'Purchase Price', isNum: true, validator: (v) => _validatePrice(v, allowZero: true))),
                         const SizedBox(width: 8),
-                        Expanded(child: _buildTextField(_sellingPriceController, 'Selling Price', isNum: true)),
+                        Expanded(child: _buildTextField(_sellingPriceController, 'Selling Price', isNum: true, validator: (v) => _validatePrice(v, allowZero: false))),
                       ],
                     ),
 
@@ -310,7 +310,16 @@ class _ProductFormState extends State<ProductForm> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool isNum = false, bool isRequired = true}) {
+  String? _validatePrice(String? v, {required bool allowZero}) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    final value = double.tryParse(v.trim());
+    if (value == null) return 'Enter a valid number';
+    if (value < 0) return 'Cannot be negative';
+    if (!allowZero && value == 0) return 'Must be greater than 0';
+    return null;
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, {bool isNum = false, bool isRequired = true, String? Function(String?)? validator}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
@@ -321,7 +330,7 @@ class _ProductFormState extends State<ProductForm> {
           labelText: label,
           hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
         ),
-        validator: isRequired ? (v) => v == null || v.isEmpty ? 'Required' : null : null,
+        validator: validator ?? (isRequired ? (v) => v == null || v.isEmpty ? 'Required' : null : null),
       ),
     );
   }

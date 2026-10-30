@@ -1808,6 +1808,35 @@ class _BillingScreenState extends State<BillingScreen> {
       final String? finalInvoiceId;
       
       if (provider.editingInvoiceId != null) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B)),
+                SizedBox(width: 8),
+                Text('Update Bill?'),
+              ],
+            ),
+            content: const Text(
+              'Updating this bill will clear all previous payment transactions. '
+              'The paid amount entered here will replace them. This cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Clear & Update', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+
         finalInvoiceId = await provider.updateInvoice(
           invoiceId: provider.editingInvoiceId!,
           customerName: _customerNameController.text,

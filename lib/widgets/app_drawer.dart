@@ -55,6 +55,14 @@ class AppDrawer extends StatelessWidget {
                   route: '/settings',
                   isActive: currentRoute == '/settings',
                 ),
+                if (Provider.of<AuthProvider>(context).canViewActivityLogs)
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.history_outlined,
+                    label: 'Activity Logs',
+                    route: '/activity-logs',
+                    isActive: currentRoute == '/activity-logs',
+                  ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.logout_rounded,

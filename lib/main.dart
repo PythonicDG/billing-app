@@ -15,6 +15,7 @@ import 'screens/products_screen.dart';
 import 'screens/billing_screen.dart';
 import 'screens/ledger_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/activity_logs_screen.dart';
 import 'settings_provider.dart';
 
 class MyHttpOverrides extends HttpOverrides {
@@ -85,6 +86,7 @@ class _VighnahartaAppState extends State<VighnahartaApp> {
           '/billing': (context) => const BillingScreen(),
           '/ledger': (context) => const LedgerScreen(),
           '/settings': (context) => const SettingsScreen(),
+          '/activity-logs': (context) => const ActivityLogsScreen(),
         },
       ),
     );

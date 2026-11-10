@@ -1,17 +1,18 @@
 class ApiConstants {
-  static const String baseUrl = 'https://billing.sadguruinfinity.com'; // Production URL (HTTPS)https://billing.sadguruinfinity.com
+  static const String baseUrl = 'http://127.0.0.1:8000'; // Production URL (HTTPS)https://billing.sadguruinfinity.com
   static const String loginUrl = '/api/login/';
   static const String changePasswordUrl = '/api/change-password/';
   static const String productsUrl = '/api/products/';
   static const String frequentProductsUrl = '/api/products/frequent/';
-  static const String staffListUrl = '/api/staff/list/';
-  static const String staffCreateUrl = '/api/staff/create/';
   static const String invoicesUrl = '/api/billing/invoices/';
   static const String invoicePreviewUrl = '/api/billing/invoices/preview/';
   static const String customersUrl = '/api/customers/';
   static String customerLedgerUrl(String id) => '/api/customers/$id/ledger/';
   static String customerBulkPaymentUrl(String id) => '/api/customers/$id/record_bulk_payment/';
   static String customerDownloadStatementUrl(String id) => '/api/customers/$id/download_statement/';
+
+  // Activity logs (owner only)
+  static const String auditLogsUrl = '/api/core/audit-logs/';
 
   // Dashboard
   static const String dashboardSummaryUrl = '/api/dashboard/summary/';
@@ -27,7 +28,6 @@ class ApiConstants {
   static String invoiceDownloadPdfUrl(String id) => '/api/billing/invoices/$id/download_pdf/';
   static String invoicePrintHtmlUrl(String id) => '/api/billing/invoices/$id/print_html/';
   static String invoiceThermalReceiptUrl(String id) => '/api/billing/invoices/$id/thermal_receipt_pdf/';
-  static String deactivateStaffUrl(int userId) => '/api/staff/$userId/deactivate/';
   static String productDetailUrl(String uuid) => '/api/products/$uuid/';
 
   static String downloadTransactionsPdfUrl({

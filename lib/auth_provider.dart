@@ -8,11 +8,16 @@ class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   String? _token;
   int? _userId;
+  String? _role;
   bool _isLoading = false;
   String? _errorMessage;
 
   String? get token => _token;
   int? get userId => _userId;
+  String? get role => _role;
+  /// True for owners. Also true when the role is not known yet (session from an
+  /// older app version) — the server still enforces owner-only access.
+  bool get canViewActivityLogs => _role == null || _role == 'OWNER';
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _token != null;
@@ -25,6 +30,7 @@ class AuthProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('token');
     _userId = prefs.getInt('userId');
+    _role = prefs.getString('role');
     notifyListeners();
   }
 
@@ -44,6 +50,11 @@ class AuthProvider with ChangeNotifier {
         _token = data['token'];
         _userId = data['user_id'];
         await _apiService.saveToken(_token!, _userId!);
+        _role = data['role'];
+        if (_role != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('role', _role!);
+        }
         _isLoading = false;
         notifyListeners();
         return true;
@@ -107,6 +118,7 @@ class AuthProvider with ChangeNotifier {
     await _apiService.logout();  // This already clears dashboard token via ApiService.logout()
     _token = null;
     _userId = null;
+    _role = null;
     notifyListeners();
   }
 }

@@ -218,6 +218,21 @@ class _LedgerScreenState extends State<LedgerScreen> {
     final amountController = TextEditingController(text: outstanding.toStringAsFixed(2));
     final notesController = TextEditingController();
     String selectedMode = 'CASH';
+    String? amountError;
+
+    // Returns an error message, or null when the entered amount is valid.
+    String? validateAmount(String text) {
+      final value = text.trim();
+      if (value.isEmpty) return 'Enter a payment amount';
+      final parsed = double.tryParse(value);
+      if (parsed == null || parsed.isNaN || parsed.isInfinite) return 'Enter a valid number';
+      final paise = (parsed * 100).round();
+      if (paise <= 0) return 'Amount must be greater than 0';
+      if (paise > (outstanding * 100).round()) {
+        return 'Amount cannot exceed the outstanding balance (${outstanding.toStringAsFixed(2)})';
+      }
+      return null;
+    }
 
     showDialog(
       context: context,
@@ -255,11 +270,21 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       TextField(
                         controller: amountController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                        ],
+                        onChanged: (value) {
+                          if (amountError != null) {
+                            setDialogState(() => amountError = validateAmount(value));
+                          }
+                        },
                         decoration: InputDecoration(
                           labelText: 'Payment Amount',
                           prefixText: 'Rs. ',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           helperText: 'This amount will be applied to the oldest bills first.',
+                          errorText: amountError,
+                          errorMaxLines: 2,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -348,13 +373,18 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       minimumSize: const Size(120, 40),
                     ),
                     onPressed: () {
-                      final amount = double.tryParse(amountController.text) ?? 0.0;
-                      if (amount <= 0) {
+                      final error = validateAmount(amountController.text);
+                      if (error != null) {
+                        setDialogState(() => amountError = error);
+                        return;
+                      }
+                      if (selectedMode != 'CASH' && selectedMode != 'UPI') {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Invalid payment amount')),
+                          const SnackBar(content: Text('Select a valid payment mode')),
                         );
                         return;
                       }
+                      final amount = double.parse(amountController.text.trim());
                       Navigator.pop(context);
                       setState(() {
                         _isLoadingLedger = true;
